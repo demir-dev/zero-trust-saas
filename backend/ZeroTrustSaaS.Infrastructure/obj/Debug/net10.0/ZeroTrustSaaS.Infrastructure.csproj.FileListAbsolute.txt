@@ -1,0 +1,17 @@
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/bin/Debug/net10.0/ZeroTrustSaaS.Infrastructure.deps.json
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/bin/Debug/net10.0/ZeroTrustSaaS.Infrastructure.dll
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/bin/Debug/net10.0/ZeroTrustSaaS.Infrastructure.pdb
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/bin/Debug/net10.0/ZeroTrustSaaS.Application.dll
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/bin/Debug/net10.0/ZeroTrustSaaS.Domain.dll
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/bin/Debug/net10.0/ZeroTrustSaaS.Domain.pdb
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/bin/Debug/net10.0/ZeroTrustSaaS.Application.pdb
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/obj/Debug/net10.0/ZeroTrustSaaS.Infrastructure.csproj.AssemblyReference.cache
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/obj/Debug/net10.0/ZeroTrustSaaS.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/obj/Debug/net10.0/ZeroTrustSaaS.Infrastructure.AssemblyInfoInputs.cache
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/obj/Debug/net10.0/ZeroTrustSaaS.Infrastructure.AssemblyInfo.cs
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/obj/Debug/net10.0/ZeroTrustSaaS.Infrastructure.csproj.CoreCompileInputs.cache
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/obj/Debug/net10.0/ZeroTrus.7454E95E.Up2Date
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/obj/Debug/net10.0/ZeroTrustSaaS.Infrastructure.dll
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/obj/Debug/net10.0/refint/ZeroTrustSaaS.Infrastructure.dll
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/obj/Debug/net10.0/ZeroTrustSaaS.Infrastructure.pdb
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Infrastructure/obj/Debug/net10.0/ref/ZeroTrustSaaS.Infrastructure.dll

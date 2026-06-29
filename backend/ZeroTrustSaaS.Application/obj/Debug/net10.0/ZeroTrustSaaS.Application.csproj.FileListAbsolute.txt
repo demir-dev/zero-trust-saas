@@ -1,0 +1,15 @@
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Application/bin/Debug/net10.0/ZeroTrustSaaS.Application.deps.json
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Application/bin/Debug/net10.0/ZeroTrustSaaS.Application.dll
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Application/bin/Debug/net10.0/ZeroTrustSaaS.Application.pdb
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Application/bin/Debug/net10.0/ZeroTrustSaaS.Domain.dll
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Application/bin/Debug/net10.0/ZeroTrustSaaS.Domain.pdb
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Application/obj/Debug/net10.0/ZeroTrustSaaS.Application.csproj.AssemblyReference.cache
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Application/obj/Debug/net10.0/ZeroTrustSaaS.Application.GeneratedMSBuildEditorConfig.editorconfig
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Application/obj/Debug/net10.0/ZeroTrustSaaS.Application.AssemblyInfoInputs.cache
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Application/obj/Debug/net10.0/ZeroTrustSaaS.Application.AssemblyInfo.cs
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Application/obj/Debug/net10.0/ZeroTrustSaaS.Application.csproj.CoreCompileInputs.cache
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Application/obj/Debug/net10.0/ZeroTrus.CE8B269F.Up2Date
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Application/obj/Debug/net10.0/ZeroTrustSaaS.Application.dll
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Application/obj/Debug/net10.0/refint/ZeroTrustSaaS.Application.dll
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Application/obj/Debug/net10.0/ZeroTrustSaaS.Application.pdb
+/Users/demirbakiu/RiderProjects/ZeroTrustSaas/backend/ZeroTrustSaaS.Application/obj/Debug/net10.0/ref/ZeroTrustSaaS.Application.dll

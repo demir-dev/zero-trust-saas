@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="ZeroTrustSaaS.Api/ZeroTrustSaaS.Api.csproj" />
+  <Project Path="ZeroTrustSaaS.Application/ZeroTrustSaaS.Application.csproj" />
+  <Project Path="ZeroTrustSaaS.Domain/ZeroTrustSaaS.Domain.csproj" />
+  <Project Path="ZeroTrustSaaS.Infrastructure/ZeroTrustSaaS.Infrastructure.csproj" />
+</Solution>
