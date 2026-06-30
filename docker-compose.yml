@@ -56,7 +56,7 @@ services:
   pgadmin:
     image: dpage/pgadmin4
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@zerotrust.local
+      PGADMIN_DEFAULT_EMAIL: admin@zerotrust.dev
       PGADMIN_DEFAULT_PASSWORD: admin
     ports:
       - "5050:80"

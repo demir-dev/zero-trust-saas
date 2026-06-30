@@ -39,24 +39,6 @@ public sealed class LoginCommandHandler(
             tenant.Id,
             cancellationToken);
 
-        var ipResult = IpAddress.Create(command.IpAddress);
-        var fingerprintResult = DeviceFingerprint.Create(command.DeviceFingerprint);
-        var clientInfoResult = ClientInfo.Create(
-            fingerprintResult.IsSuccess ? fingerprintResult.Value : DeviceFingerprint.From("unknown"),
-            ipResult.IsSuccess ? ipResult.Value : IpAddress.Empty(),
-            command.Country,
-            command.Browser,
-            command.OperatingSystem);
-
-        var clientInfo = clientInfoResult.IsSuccess
-            ? clientInfoResult.Value
-            : ClientInfo.From(
-                DeviceFingerprint.From("unknown"),
-                IpAddress.Empty(),
-                command.Country,
-                command.Browser,
-                command.OperatingSystem);
-
         var now = dateTimeProvider.UtcNow;
 
         if (user is null || !passwordHasher.Verify(command.Password, user.PasswordHash.Value))
@@ -65,7 +47,7 @@ public sealed class LoginCommandHandler(
             {
                 var failedAttemptResult = LoginAttempt.Create(
                     user.Id,
-                    clientInfo,
+                    BuildClientInfo(command),
                     LoginResult.InvalidCredentials,
                     RiskLevel.Medium,
                     now);
@@ -73,13 +55,14 @@ public sealed class LoginCommandHandler(
                 if (failedAttemptResult.IsSuccess)
                     user.RecordFailedLogin(failedAttemptResult.Value, now);
 
+                var failedAuditIp = IpAddress.Create(command.IpAddress);
                 await LogSecurityEvent(
                     SecurityEventType.LoginFailed,
                     AuditSeverity.Warning,
                     now,
                     user.Id,
                     user.TenantId,
-                    ipResult.IsSuccess ? ipResult.Value : null,
+                    failedAuditIp.IsSuccess ? failedAuditIp.Value : null,
                     command.UserAgent,
                     auditLogRepository,
                     cancellationToken);
@@ -106,7 +89,7 @@ public sealed class LoginCommandHandler(
         {
             var mfaAttemptResult = LoginAttempt.Create(
                 user.Id,
-                clientInfo,
+                BuildClientInfo(command),
                 LoginResult.MfaRequired,
                 RiskLevel.Low,
                 now);
@@ -125,15 +108,13 @@ public sealed class LoginCommandHandler(
                 UserId: user.Id));
         }
 
-        return await IssueTokensAsync(user, clientInfo, now, command.UserAgent, ipResult, auditLogRepository, cancellationToken);
+        return await IssueTokensAsync(user, command, now, auditLogRepository, cancellationToken);
     }
 
     private async Task<Result<LoginResponse>> IssueTokensAsync(
         User user,
-        ClientInfo clientInfo,
+        LoginCommand command,
         DateTime now,
-        string userAgent,
-        Result<IpAddress> ipResult,
         IAuditLogRepository auditLogRepository,
         CancellationToken cancellationToken)
     {
@@ -141,14 +122,17 @@ public sealed class LoginCommandHandler(
         string hashedToken = tokenGenerator.HashRefreshToken(rawRefreshToken);
 
         var tokenHashResult = RefreshTokenHash.Create(hashedToken);
-
         if (tokenHashResult.IsFailure)
             return Result<LoginResponse>.Failure(tokenHashResult.Error);
+
+        // Build a dedicated ClientInfo for the RefreshToken — must not share the
+        // same CLR instance with LoginAttempt; EF tracks owned entities by owner path.
+        var tokenClientInfo = BuildClientInfo(command);
 
         var refreshTokenResult = DomainRefreshToken.Create(
             user.Id,
             tokenHashResult.Value,
-            clientInfo,
+            tokenClientInfo,
             now,
             now.Add(RefreshTokenLifetime));
 
@@ -156,13 +140,15 @@ public sealed class LoginCommandHandler(
             return Result<LoginResponse>.Failure(refreshTokenResult.Error);
 
         var issueResult = user.IssueRefreshToken(refreshTokenResult.Value, now);
-
         if (issueResult.IsFailure)
             return Result<LoginResponse>.Failure(issueResult.Error);
 
+        // Build a separate ClientInfo instance for the LoginAttempt aggregate.
+        var attemptClientInfo = BuildClientInfo(command);
+
         var successAttemptResult = LoginAttempt.Create(
             user.Id,
-            clientInfo,
+            attemptClientInfo,
             LoginResult.Success,
             RiskLevel.Low,
             now);
@@ -177,14 +163,16 @@ public sealed class LoginCommandHandler(
 
         userRepository.Update(user);
 
+        // Build a fresh IpAddress for AuditLog — must not share with ClientInfo instances.
+        var auditIpResult = IpAddress.Create(command.IpAddress);
         await LogSecurityEvent(
             SecurityEventType.LoginSucceeded,
             AuditSeverity.Info,
             now,
             user.Id,
             user.TenantId,
-            ipResult.IsSuccess ? ipResult.Value : null,
-            userAgent,
+            auditIpResult.IsSuccess ? auditIpResult.Value : null,
+            command.UserAgent,
             auditLogRepository,
             cancellationToken);
 
@@ -196,6 +184,22 @@ public sealed class LoginCommandHandler(
             Result: LoginResult.Success,
             RequiresMfa: false,
             UserId: user.Id));
+    }
+
+    private static ClientInfo BuildClientInfo(LoginCommand command)
+    {
+        var fp = DeviceFingerprint.Create(command.DeviceFingerprint);
+        var ip = IpAddress.Create(command.IpAddress);
+        var result = ClientInfo.Create(
+            fp.IsSuccess ? fp.Value : DeviceFingerprint.From("unknown"),
+            ip.IsSuccess ? ip.Value : IpAddress.Empty(),
+            command.Country,
+            command.Browser,
+            command.OperatingSystem);
+        return result.IsSuccess
+            ? result.Value
+            : ClientInfo.From(DeviceFingerprint.From("unknown"), IpAddress.Empty(),
+                command.Country, command.Browser, command.OperatingSystem);
     }
 
     private static async Task LogSecurityEvent(
