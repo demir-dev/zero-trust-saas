@@ -45,11 +45,13 @@ services:
       dockerfile: Dockerfile
     depends_on:
       - api
-    environment:
-      VITE_API_URL: "http://localhost:8080"
-      VITE_API_PROXY_TARGET: "http://api:8080"
     ports:
-      - "5173:5173"
+      - "5173:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     networks:
       - zerotrust_network
 
