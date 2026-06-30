@@ -5,15 +5,17 @@ namespace ZeroTrustSaaS.Domain.Devices;
 
 public sealed class ClientInfo : ValueObject
 {
-    public DeviceFingerprint DeviceFingerprint { get; }
+    public DeviceFingerprint DeviceFingerprint { get; private set; } = null!;
 
-    public IpAddress IpAddress { get; }
+    public IpAddress IpAddress { get; private set; } = null!;
 
-    public string Country { get; }
+    public string Country { get; private set; } = string.Empty;
 
-    public string Browser { get; }
+    public string Browser { get; private set; } = string.Empty;
 
-    public string OperatingSystem { get; }
+    public string OperatingSystem { get; private set; } = string.Empty;
+
+    private ClientInfo() { }
 
     private ClientInfo(
         DeviceFingerprint deviceFingerprint,

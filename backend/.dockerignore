@@ -1,0 +1,10 @@
+bin/
+obj/
+.git/
+.idea/
+.vs/
+*.user
+*.suo
+.env
+.env.*
+appsettings.Development.json

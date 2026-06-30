@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+.git/
+.idea/
+.vs/
+.env
+.env.*
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*

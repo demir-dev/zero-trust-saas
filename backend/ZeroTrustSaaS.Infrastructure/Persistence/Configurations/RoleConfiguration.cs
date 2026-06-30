@@ -26,9 +26,5 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
 
         builder.Property(r => r.IsSystem).IsRequired();
 
-        builder.HasMany<RolePermission>()
-            .WithOne()
-            .HasForeignKey(rp => rp.RoleId)
-            .OnDelete(DeleteBehavior.Cascade);
     }
 }

@@ -21,11 +21,8 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
                 .HasColumnName("email")
                 .HasMaxLength(320)
                 .IsRequired();
-
-            email.HasIndex(e => new { e.Value, TenantId = EF.Property<Guid>(email.OwnedEntityType.FindPrimaryKey()!.Properties[0].Name, "TenantId") })
-                .IsUnique()
-                .HasDatabaseName("ix_users_email_tenant_id");
         });
+
 
         builder.OwnsOne(u => u.PasswordHash, ph =>
         {
@@ -65,14 +62,5 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(u => u.Version).IsRequired();
 
-        builder.HasMany<RefreshToken>()
-            .WithOne()
-            .HasForeignKey(rt => rt.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasMany<LoginAttempt>()
-            .WithOne()
-            .HasForeignKey(la => la.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
     }
 }
