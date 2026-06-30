@@ -12,6 +12,14 @@ public interface IUserRepository
 
     Task<int> CountTotalAsync(CancellationToken cancellationToken = default);
 
+    Task<int> CountMfaEnabledAsync(CancellationToken cancellationToken = default);
+
+    Task<int> CountLockedAsync(CancellationToken cancellationToken = default);
+
+    Task<int> CountMfaEnabledByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default);
+
+    Task<int> CountLockedByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default);
+
     Task AddAsync(User user, CancellationToken cancellationToken = default);
 
     void Update(User user);

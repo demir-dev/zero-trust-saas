@@ -115,6 +115,16 @@ public static class UserErrors
             "Users.MfaAlreadyDisabled",
             "Multi-factor authentication is already disabled.");
 
+    public static readonly Error MfaNotEnabled =
+        Error.Conflict(
+            "Users.MfaNotEnabled",
+            "Multi-factor authentication is not enabled for this user.");
+
+    public static readonly Error InvalidMfaCode =
+        Error.Validation(
+            "Users.InvalidMfaCode",
+            "The provided MFA code is invalid.");
+
     // Login
     public static readonly Error LoginNotAllowed =
         Error.Conflict(

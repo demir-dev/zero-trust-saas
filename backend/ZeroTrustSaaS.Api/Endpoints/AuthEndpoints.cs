@@ -3,6 +3,9 @@ using ZeroTrustSaaS.Application.Abstractions.Services;
 using ZeroTrustSaaS.Application.Features.Identity.Login;
 using ZeroTrustSaaS.Application.Features.Identity.Logout;
 using ZeroTrustSaaS.Application.Features.Identity.Mfa;
+using ZeroTrustSaaS.Application.Features.Identity.Mfa.SetupTotp;
+using ZeroTrustSaaS.Application.Features.Identity.Mfa.VerifyAndEnableMfa;
+using ZeroTrustSaaS.Application.Features.Identity.Mfa.VerifyMfa;
 using ZeroTrustSaaS.Application.Features.Identity.RefreshToken;
 
 namespace ZeroTrustSaaS.Api.Endpoints;
@@ -65,22 +68,64 @@ internal static class AuthEndpoints
                 : ApiErrors.Problem(result.Error);
         });
 
-        group.MapPost("/mfa/enable", async (
-            EnableMfaRequest request,
-            EnableMfaCommandHandler handler,
+        group.MapGet("/mfa/setup", async (
+            SetupTotpQueryHandler handler,
+            ICurrentUserContext currentUser,
             CancellationToken ct) =>
         {
-            var command = new EnableMfaCommand(
-                request.UserId,
-                request.Method,
-                request.Secret);
+            var query = new SetupTotpQuery(currentUser.UserId);
+            var result = await handler.Handle(query, ct);
+
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : ApiErrors.Problem(result.Error);
+        }).RequireAuthorization();
+
+        group.MapPost("/mfa/verify-enable", async (
+            VerifyAndEnableMfaRequest request,
+            VerifyAndEnableMfaCommandHandler handler,
+            ICurrentUserContext currentUser,
+            CancellationToken ct) =>
+        {
+            var command = new VerifyAndEnableMfaCommand(
+                currentUser.UserId,
+                request.Base32Secret,
+                request.VerificationCode);
 
             var result = await handler.Handle(command, ct);
 
             return result.IsSuccess
-                ? Results.NoContent()
+                ? Results.Ok(result.Value)
                 : ApiErrors.Problem(result.Error);
         }).RequireAuthorization();
+
+        group.MapPost("/mfa/verify", async (
+            VerifyMfaRequest request,
+            VerifyMfaCommandHandler handler,
+            HttpContext httpContext,
+            CancellationToken ct) =>
+        {
+            var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers.UserAgent.ToString();
+
+            var command = new VerifyMfaCommand(
+                request.UserId,
+                request.TenantSlug,
+                request.Code,
+                request.IsRecoveryCode,
+                ip,
+                userAgent,
+                request.DeviceFingerprint,
+                request.Country,
+                request.Browser,
+                request.OperatingSystem);
+
+            var result = await handler.Handle(command, ct);
+
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : ApiErrors.Problem(result.Error);
+        });
 
         group.MapPost("/logout", async (
             LogoutCommandHandler handler,
@@ -127,9 +172,16 @@ internal sealed record RefreshRequest(
     string Browser,
     string OperatingSystem);
 
-internal sealed record EnableMfaRequest(
+internal sealed record VerifyAndEnableMfaRequest(string Base32Secret, string VerificationCode);
+
+internal sealed record VerifyMfaRequest(
     Guid UserId,
-    ZeroTrustSaaS.Domain.Security.Enums.MfaMethod Method,
-    string Secret);
+    string? TenantSlug,
+    string Code,
+    bool IsRecoveryCode,
+    string DeviceFingerprint,
+    string Country,
+    string Browser,
+    string OperatingSystem);
 
 internal sealed record DisableMfaRequest(Guid UserId);

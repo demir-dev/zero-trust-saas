@@ -4,7 +4,6 @@ using ZeroTrustSaaS.Application.Features.Tenants.ActivateTenant;
 using ZeroTrustSaaS.Application.Features.Tenants.CreateTenant;
 using ZeroTrustSaaS.Application.Features.Tenants.GetTenants;
 using ZeroTrustSaaS.Application.Features.Tenants.SuspendTenant;
-using ZeroTrustSaaS.Domain.Tenants;
 
 namespace ZeroTrustSaaS.Api.Endpoints;
 
@@ -46,7 +45,6 @@ internal static class PlatformEndpoints
             var command = new CreateTenantCommand(
                 request.Name,
                 request.Slug,
-                request.Plan,
                 request.OwnerFirstName,
                 request.OwnerLastName,
                 request.OwnerEmail,
@@ -96,7 +94,6 @@ internal static class PlatformEndpoints
 internal sealed record CreateTenantRequest(
     string Name,
     string Slug,
-    TenantPlan Plan,
     string OwnerFirstName,
     string OwnerLastName,
     string OwnerEmail,
