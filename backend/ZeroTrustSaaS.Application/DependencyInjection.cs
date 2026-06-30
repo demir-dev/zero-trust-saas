@@ -9,6 +9,10 @@ using ZeroTrustSaaS.Application.Features.Authorization.GetPermissions;
 using ZeroTrustSaaS.Application.Features.Authorization.GetRoles;
 using ZeroTrustSaaS.Application.Features.Authorization.RemovePermissionFromRole;
 using ZeroTrustSaaS.Application.Features.Authorization.RenameRole;
+using ZeroTrustSaaS.Application.Features.Authorization.RevokeUserRole;
+using ZeroTrustSaaS.Application.Features.Identity.CreateTenantUser;
+using ZeroTrustSaaS.Application.Features.Identity.ForcePasswordReset;
+using ZeroTrustSaaS.Application.Features.Identity.GetUserDetails;
 using ZeroTrustSaaS.Application.Features.Dashboard.GetSecurityOverview;
 using ZeroTrustSaaS.Application.Features.Devices.BlockDevice;
 using ZeroTrustSaaS.Application.Features.Devices.GetDevices;
@@ -66,17 +70,21 @@ public static class DependencyInjection
         services.AddScoped<SuspendTenantCommandHandler>();
         services.AddScoped<ActivateTenantCommandHandler>();
         services.AddScoped<AssignRoleCommandHandler>();
+        services.AddScoped<RevokeUserRoleCommandHandler>();
         services.AddScoped<CreateRoleCommandHandler>();
         services.AddScoped<DeleteRoleCommandHandler>();
         services.AddScoped<RenameRoleCommandHandler>();
         services.AddScoped<CloneRoleCommandHandler>();
         services.AddScoped<AssignPermissionToRoleCommandHandler>();
         services.AddScoped<RemovePermissionFromRoleCommandHandler>();
+        services.AddScoped<CreateTenantUserCommandHandler>();
+        services.AddScoped<ForcePasswordResetCommandHandler>();
         services.AddScoped<CheckPlatformStatusQueryHandler>();
         services.AddScoped<InitializePlatformCommandHandler>();
 
         // Queries
         services.AddScoped<GetCurrentUserQueryHandler>();
+        services.AddScoped<GetUserDetailsQueryHandler>();
         services.AddScoped<GetUsersQueryHandler>();
         services.AddScoped<GetTenantsQueryHandler>();
         services.AddScoped<GetTenantQueryHandler>();

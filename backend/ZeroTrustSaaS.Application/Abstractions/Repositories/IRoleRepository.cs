@@ -28,4 +28,6 @@ public interface IRoleRepository
     void Remove(Role role);
 
     void UpdateUserRole(UserRole userRole);
+
+    void RemoveUserRole(UserRole userRole);
 }
