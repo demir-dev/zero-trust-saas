@@ -68,6 +68,20 @@ export function AuthProvider({ children }) {
     return { result, requiresMfa, userId, accessToken: token }
   }, [applyToken])
 
+  const verifyMfa = useCallback(async (userId, tenantSlug, code, isRecoveryCode, extraDeviceInfo) => {
+    const deviceInfo = { ...buildDeviceInfo(), ...extraDeviceInfo }
+    const res = await api.post('/auth/mfa/verify', {
+      userId,
+      tenantSlug: tenantSlug ?? null,
+      code,
+      isRecoveryCode,
+      ...deviceInfo,
+    })
+    const { accessToken: token, refreshToken, result, requiresMfa, userId: uid } = res.data
+    if (token) applyToken(token, refreshToken)
+    return { result, requiresMfa, userId: uid, accessToken: token }
+  }, [applyToken])
+
   const logout = useCallback(async () => {
     try { await api.post('/auth/logout') } catch { /* ignore */ }
     clearTokens()
@@ -85,6 +99,8 @@ export function AuthProvider({ children }) {
     const isPlatformUser = platformRoles.length > 0
     const hasTenantContext = !!tenantId
 
+    const hasPermission = (code) => permissions.includes(code)
+
     return {
       accessToken,
       user, setUser,
@@ -95,12 +111,14 @@ export function AuthProvider({ children }) {
       isAuthenticated,
       isPlatformUser,
       hasTenantContext,
+      hasPermission,
       login,
       loginWithTenant,
+      verifyMfa,
       logout,
       applyToken,
     }
-  }, [accessToken, claims, user, setUser, login, loginWithTenant, logout, applyToken])
+  }, [accessToken, claims, user, setUser, login, loginWithTenant, verifyMfa, logout, applyToken])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
