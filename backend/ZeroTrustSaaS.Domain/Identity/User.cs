@@ -1,6 +1,8 @@
 using ZeroTrustSaaS.Domain.Common;
+using ZeroTrustSaaS.Domain.Identity.Enums;
 using ZeroTrustSaaS.Domain.Identity.Errors;
 using ZeroTrustSaaS.Domain.Security;
+using ZeroTrustSaaS.Domain.Security.Enums;
 
 namespace ZeroTrustSaaS.Domain.Identity;
 
@@ -24,12 +26,11 @@ public sealed class User : SecureAggregateRoot
         Email email,
         PasswordHash passwordHash,
         DateTime createdAtUtc)
+        : base(id)
     {
-        Id = id;
         TenantId = tenantId;
         Email = email;
         PasswordHash = passwordHash;
-        SecurityStamp = SecurityStamp.Create();
         Status = UserStatus.PendingVerification;
         IsEmailConfirmed = false;
         IsMfaEnabled = false;
@@ -43,8 +44,6 @@ public sealed class User : SecureAggregateRoot
     public Email Email { get; private set; } = null!;
 
     public PasswordHash PasswordHash { get; private set; } = null!;
-
-    public new SecurityStamp SecurityStamp { get; private set; } = null!;
 
     public UserStatus Status { get; private set; }
 
@@ -360,7 +359,7 @@ public sealed class User : SecureAggregateRoot
         if (token is null)
             return Result.Failure(UserErrors.RefreshTokenNotFound);
 
-        token.Revoke(revokedAtUtc);
+        token.Revoke(revokedAtUtc, RefreshTokenRevocationReason.UserLogout);
 
         return Result.Success();
     }
@@ -396,12 +395,12 @@ public sealed class User : SecureAggregateRoot
     {
         var activeRefreshTokens = _refreshTokens
             .Where(x => !x.IsRevoked && !x.IsExpired)
-            .OrderByDescending(x => x.CreatedAtUtc)
+            .OrderByDescending(x => x.IssuedAtUtc)
             .ToList();
 
         foreach (var token in activeRefreshTokens.Skip(MaxActiveRefreshTokens))
         {
-            token.Revoke(revokedAtUtc);
+            token.Revoke(revokedAtUtc, RefreshTokenRevocationReason.SecurityStampRotated);
         }
     }
 
@@ -409,12 +408,12 @@ public sealed class User : SecureAggregateRoot
     {
         foreach (var token in _refreshTokens.Where(x => !x.IsRevoked))
         {
-            token.Revoke(revokedAtUtc);
+            token.Revoke(revokedAtUtc, RefreshTokenRevocationReason.SecurityStampRotated);
         }
     }
 
     private void RefreshSecurityStamp()
     {
-        SecurityStamp = SecurityStamp.Create();
+        RotateSecurityStamp();
     }
 }

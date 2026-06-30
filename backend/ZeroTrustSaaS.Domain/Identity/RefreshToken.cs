@@ -149,4 +149,11 @@ public sealed class RefreshToken : Entity
 
         return Result.Success();
     }
+
+    public Result Revoke(
+        DateTime revokedAtUtc,
+        RefreshTokenRevocationReason reason)
+    {
+        return Revoke(revokedAtUtc, IpAddress.Empty(), reason);
+    }
 }
