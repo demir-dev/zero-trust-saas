@@ -6,6 +6,8 @@ public interface IRoleRepository
 {
     Task<Role?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<Role?> GetByNameAsync(string name, Guid? tenantId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Role>> GetByTenantIdAsync(
         Guid tenantId,
         CancellationToken cancellationToken = default);

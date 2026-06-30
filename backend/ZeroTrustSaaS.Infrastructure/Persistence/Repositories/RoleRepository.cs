@@ -9,7 +9,20 @@ internal sealed class RoleRepository(AppDbContext dbContext) : IRoleRepository
     public Task<Role?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return dbContext.Roles
+            .Include("Permissions")
             .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+    }
+
+    public Task<Role?> GetByNameAsync(
+        string name,
+        Guid? tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.Roles
+            .Include("Permissions")
+            .FirstOrDefaultAsync(
+                r => r.Name.Value == name && r.TenantId == tenantId,
+                cancellationToken);
     }
 
     public async Task<IReadOnlyList<Role>> GetByTenantIdAsync(
@@ -17,6 +30,7 @@ internal sealed class RoleRepository(AppDbContext dbContext) : IRoleRepository
         CancellationToken cancellationToken = default)
     {
         return await dbContext.Roles
+            .Include("Permissions")
             .Where(r => r.TenantId == tenantId)
             .ToListAsync(cancellationToken);
     }

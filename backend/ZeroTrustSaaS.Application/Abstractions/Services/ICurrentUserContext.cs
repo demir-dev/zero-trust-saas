@@ -4,7 +4,13 @@ public interface ICurrentUserContext
 {
     Guid UserId { get; }
 
-    Guid TenantId { get; }
+    Guid? TenantId { get; }
+
+    IEnumerable<string> PlatformRoles { get; }
+
+    bool IsPlatformUser { get; }
+
+    IEnumerable<string> Permissions { get; }
 
     string? IpAddress { get; }
 

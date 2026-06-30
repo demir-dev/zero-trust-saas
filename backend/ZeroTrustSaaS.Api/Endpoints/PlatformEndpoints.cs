@@ -1,6 +1,10 @@
 using ZeroTrustSaaS.Api.Helpers;
-using ZeroTrustSaaS.Application.Features.Platform.CheckPlatformStatus;
-using ZeroTrustSaaS.Application.Features.Platform.InitializePlatform;
+using ZeroTrustSaaS.Application.Abstractions.Services;
+using ZeroTrustSaaS.Application.Features.Tenants.ActivateTenant;
+using ZeroTrustSaaS.Application.Features.Tenants.CreateTenant;
+using ZeroTrustSaaS.Application.Features.Tenants.GetTenants;
+using ZeroTrustSaaS.Application.Features.Tenants.SuspendTenant;
+using ZeroTrustSaaS.Domain.Tenants;
 
 namespace ZeroTrustSaaS.Api.Endpoints;
 
@@ -8,44 +12,92 @@ internal static class PlatformEndpoints
 {
     internal static void MapPlatformEndpoints(this WebApplication app)
     {
-        var group = app.MapGroup("/platform").WithTags("Platform");
+        var group = app.MapGroup("/platform")
+            .WithTags("Platform")
+            .RequireAuthorization();
 
-        group.MapGet("/status", async (
-            CheckPlatformStatusQueryHandler handler,
-            CancellationToken ct) =>
+        group.MapGet("/tenants", async (
+            GetTenantsQueryHandler handler,
+            ICurrentUserContext currentUser,
+            int page = 1,
+            int pageSize = 20,
+            CancellationToken ct = default) =>
         {
-            var result = await handler.Handle(new CheckPlatformStatusQuery(), ct);
+            if (!currentUser.IsPlatformUser)
+                return Results.Forbid();
+
+            var query = new GetTenantsQuery(page, pageSize);
+            var result = await handler.Handle(query, ct);
+
             return result.IsSuccess
-                ? Results.Ok(new PlatformStatusResponse(result.Value))
+                ? Results.Ok(result.Value)
                 : ApiErrors.Problem(result.Error);
         });
 
-        group.MapPost("/initialize", async (
-            InitializePlatformRequest request,
-            InitializePlatformCommandHandler handler,
+        group.MapPost("/tenants", async (
+            CreateTenantRequest request,
+            CreateTenantCommandHandler handler,
+            ICurrentUserContext currentUser,
             CancellationToken ct) =>
         {
-            var command = new InitializePlatformCommand(
-                request.OrganizationName,
-                request.OrganizationSlug,
-                request.AdminFirstName,
-                request.AdminLastName,
-                request.AdminEmail,
-                request.AdminPassword);
+            if (!currentUser.IsPlatformUser)
+                return Results.Forbid();
+
+            var command = new CreateTenantCommand(
+                request.Name,
+                request.Slug,
+                request.Plan,
+                request.OwnerFirstName,
+                request.OwnerLastName,
+                request.OwnerEmail,
+                request.OwnerPassword);
 
             var result = await handler.Handle(command, ct);
 
             return result.IsSuccess
-                ? Results.Ok(new { organizationId = result.Value })
+                ? Results.Ok(new { tenantId = result.Value })
+                : ApiErrors.Problem(result.Error);
+        });
+
+        group.MapPost("/tenants/{id:guid}/suspend", async (
+            Guid id,
+            SuspendTenantCommandHandler handler,
+            ICurrentUserContext currentUser,
+            CancellationToken ct) =>
+        {
+            if (!currentUser.IsPlatformUser)
+                return Results.Forbid();
+
+            var result = await handler.Handle(new SuspendTenantCommand(id), ct);
+
+            return result.IsSuccess
+                ? Results.NoContent()
+                : ApiErrors.Problem(result.Error);
+        });
+
+        group.MapPost("/tenants/{id:guid}/activate", async (
+            Guid id,
+            ActivateTenantCommandHandler handler,
+            ICurrentUserContext currentUser,
+            CancellationToken ct) =>
+        {
+            if (!currentUser.IsPlatformUser)
+                return Results.Forbid();
+
+            var result = await handler.Handle(new ActivateTenantCommand(id), ct);
+
+            return result.IsSuccess
+                ? Results.NoContent()
                 : ApiErrors.Problem(result.Error);
         });
     }
 }
 
-internal sealed record InitializePlatformRequest(
-    string OrganizationName,
-    string OrganizationSlug,
-    string AdminFirstName,
-    string AdminLastName,
-    string AdminEmail,
-    string AdminPassword);
+internal sealed record CreateTenantRequest(
+    string Name,
+    string Slug,
+    TenantPlan Plan,
+    string OwnerFirstName,
+    string OwnerLastName,
+    string OwnerEmail,
+    string OwnerPassword);

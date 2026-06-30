@@ -14,6 +14,7 @@ namespace ZeroTrustSaaS.Application.Features.Identity.RefreshToken;
 public sealed class RefreshTokenCommandHandler(
     IUserRepository userRepository,
     IRefreshTokenRepository refreshTokenRepository,
+    IRoleRepository roleRepository,
     IAuditLogRepository auditLogRepository,
     ITokenGenerator tokenGenerator,
     IDateTimeProvider dateTimeProvider,
@@ -27,9 +28,7 @@ public sealed class RefreshTokenCommandHandler(
     {
         string hashedInput = tokenGenerator.HashRefreshToken(command.RefreshToken);
 
-        var existingToken = await refreshTokenRepository.GetByHashAsync(
-            hashedInput,
-            cancellationToken);
+        var existingToken = await refreshTokenRepository.GetByHashAsync(hashedInput, cancellationToken);
 
         if (existingToken is null)
             return Result<RefreshTokenResponse>.Failure(UserErrors.RefreshTokenNotFound);
@@ -84,34 +83,82 @@ public sealed class RefreshTokenCommandHandler(
         string newHashedToken = tokenGenerator.HashRefreshToken(newRawToken);
 
         var newTokenHashResult = RefreshTokenHash.Create(newHashedToken);
-
         if (newTokenHashResult.IsFailure)
             return Result<RefreshTokenResponse>.Failure(newTokenHashResult.Error);
+
+        // Re-issue with same tenant context (null = platform, set = tenant).
+        var tenantId = existingToken.TenantId;
 
         var newRefreshTokenResult = Domain.Identity.RefreshToken.Create(
             activeUser.Id,
             newTokenHashResult.Value,
             clientInfo,
             now,
-            now.Add(RefreshTokenLifetime));
+            now.Add(RefreshTokenLifetime),
+            tenantId);
 
         if (newRefreshTokenResult.IsFailure)
             return Result<RefreshTokenResponse>.Failure(newRefreshTokenResult.Error);
 
         var rotateResult = existingToken.Rotate(newRefreshTokenResult.Value.Id, now);
-
         if (rotateResult.IsFailure)
             return Result<RefreshTokenResponse>.Failure(rotateResult.Error);
 
         var issueResult = activeUser.IssueRefreshToken(newRefreshTokenResult.Value, now);
-
         if (issueResult.IsFailure)
             return Result<RefreshTokenResponse>.Failure(issueResult.Error);
 
-        string accessToken = tokenGenerator.GenerateJwtToken(
-            activeUser.Id,
-            activeUser.TenantId,
-            []);
+        // Re-build JWT claims matching the same context as the original token.
+        string accessToken;
+
+        if (tenantId is null)
+        {
+            var userRoles = await roleRepository.GetUserRolesAsync(activeUser.Id, null, cancellationToken);
+            var platformRoleNames = new List<string>();
+
+            foreach (var ur in userRoles.Where(r => r.IsActive))
+            {
+                var role = await roleRepository.GetByIdAsync(ur.RoleId, cancellationToken);
+                if (role is not null)
+                    platformRoleNames.Add(role.Name.Value);
+            }
+
+            accessToken = tokenGenerator.GenerateJwtToken(
+                activeUser.Id,
+                activeUser.Email.Value,
+                activeUser.SecurityStamp.Value.ToString(),
+                platformRoleNames,
+                tenantId: null,
+                tenantRole: null,
+                permissions: []);
+        }
+        else
+        {
+            var userRoles = await roleRepository.GetUserRolesAsync(activeUser.Id, tenantId, cancellationToken);
+            var activeUserRole = userRoles.FirstOrDefault(ur => ur.IsActive);
+
+            string tenantRoleName = string.Empty;
+            var permissionCodes = new List<string>();
+
+            if (activeUserRole is not null)
+            {
+                var role = await roleRepository.GetByIdAsync(activeUserRole.RoleId, cancellationToken);
+                if (role is not null)
+                {
+                    tenantRoleName = role.Name.Value;
+                    permissionCodes.AddRange(role.Permissions.Select(p => p.Code.Value));
+                }
+            }
+
+            accessToken = tokenGenerator.GenerateJwtToken(
+                activeUser.Id,
+                activeUser.Email.Value,
+                activeUser.SecurityStamp.Value.ToString(),
+                platformRoles: [],
+                tenantId: tenantId,
+                tenantRole: tenantRoleName,
+                permissions: permissionCodes);
+        }
 
         refreshTokenRepository.Update(existingToken);
         userRepository.Update(activeUser);
@@ -121,7 +168,7 @@ public sealed class RefreshTokenCommandHandler(
             AuditSeverity.Info,
             now,
             userId: activeUser.Id,
-            tenantId: activeUser.TenantId,
+            tenantId: tenantId,
             ipAddress: ipResult.IsSuccess ? ipResult.Value : null,
             userAgent: command.UserAgent);
 

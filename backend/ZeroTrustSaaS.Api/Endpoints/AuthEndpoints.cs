@@ -112,7 +112,7 @@ internal static class AuthEndpoints
 }
 
 internal sealed record LoginRequest(
-    string TenantSlug,
+    string? TenantSlug,
     string Email,
     string Password,
     string DeviceFingerprint,

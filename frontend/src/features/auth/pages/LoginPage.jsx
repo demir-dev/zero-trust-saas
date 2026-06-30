@@ -16,7 +16,7 @@ import { useAuth } from '../store/authStore'
 import ProblemAlert from '../../../shared/components/ProblemAlert'
 
 const schema = z.object({
-  organizationSlug: z.string().min(1, 'Organization is required'),
+  organizationSlug: z.string().optional(),
   email: z.string().email('Invalid email'),
   password: z.string().min(1, 'Password is required'),
   deviceFingerprint: z.string().optional(),
@@ -106,7 +106,7 @@ export default function LoginPage() {
                 autoCapitalize="none"
                 {...register('organizationSlug')}
                 error={!!errors.organizationSlug}
-                helperText={errors.organizationSlug?.message ?? 'Your organization identifier'}
+                helperText={errors.organizationSlug?.message ?? 'Your organization identifier (leave blank if signing in as platform admin)'}
                 size="small"
                 InputProps={{
                   startAdornment: (

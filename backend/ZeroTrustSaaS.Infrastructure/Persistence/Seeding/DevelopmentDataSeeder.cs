@@ -1,24 +1,38 @@
 using ZeroTrustSaaS.Application.Features.Platform.InitializePlatform;
+using ZeroTrustSaaS.Application.Features.Tenants.CreateTenant;
+using ZeroTrustSaaS.Domain.Tenants;
 
 namespace ZeroTrustSaaS.Infrastructure.Persistence.Seeding;
 
 /// <summary>
 /// Seeds development data on first startup. Never runs in Production.
-/// Delegates to InitializePlatformCommandHandler — no logic duplication.
+/// Creates a PlatformOwner + a demo tenant idempotently.
 /// </summary>
-public sealed class DevelopmentDataSeeder(InitializePlatformCommandHandler handler)
+public sealed class DevelopmentDataSeeder(
+    InitializePlatformCommandHandler initHandler,
+    CreateTenantCommandHandler tenantHandler)
 {
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
-        var command = new InitializePlatformCommand(
-            OrganizationName: "ZeroTrust Labs",
-            OrganizationSlug: "zerotrust",
-            AdminFirstName: "Admin",
-            AdminLastName: "User",
-            AdminEmail: "admin@zerotrust.local",
-            AdminPassword: "Admin123!");
+        // Returns AlreadyInitialized if already seeded — idempotent.
+        await initHandler.Handle(
+            new InitializePlatformCommand(
+                FirstName: "Platform",
+                LastName: "Owner",
+                Email: "owner@zerotrust.local",
+                Password: "Admin123!"),
+            cancellationToken);
 
-        // Handler returns AlreadyInitialized if already seeded — idempotent
-        await handler.Handle(command, cancellationToken);
+        // Returns SlugAlreadyExists on second run — idempotent.
+        await tenantHandler.Handle(
+            new CreateTenantCommand(
+                Name: "ZeroTrust Labs",
+                Slug: "zerotrust",
+                Plan: TenantPlan.Standard,
+                OwnerFirstName: "Tenant",
+                OwnerLastName: "Admin",
+                OwnerEmail: "admin@zerotrust.local",
+                OwnerPassword: "Admin123!"),
+            cancellationToken);
     }
 }

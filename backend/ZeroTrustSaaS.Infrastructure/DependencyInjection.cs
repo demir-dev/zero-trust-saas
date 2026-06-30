@@ -30,16 +30,19 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<ITenantMembershipRepository, TenantMembershipRepository>();
         services.AddScoped<ITrustedDeviceRepository, TrustedDeviceRepository>();
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
+        services.AddScoped<IPlatformConfigurationRepository, PlatformConfigurationRepository>();
 
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddSingleton<ITokenGenerator, JwtTokenGenerator>();
         services.AddSingleton<IDateTimeProvider, UtcDateTimeProvider>();
         services.AddSingleton<IMfaCodeValidator, TotpMfaCodeValidator>();
 
+        services.AddScoped<PlatformConfigurationSeeder>();
         services.AddScoped<PermissionRegistrySeeder>();
         services.AddScoped<DevelopmentDataSeeder>();
 

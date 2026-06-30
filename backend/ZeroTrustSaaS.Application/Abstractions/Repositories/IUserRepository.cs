@@ -6,19 +6,9 @@ public interface IUserRepository
 {
     Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
-    Task<User?> GetByEmailAsync(string email, Guid tenantId, CancellationToken cancellationToken = default);
+    Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
 
-    Task<bool> ExistsByEmailAsync(string email, Guid tenantId, CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<User>> GetByTenantIdAsync(
-        Guid tenantId,
-        int page,
-        int pageSize,
-        CancellationToken cancellationToken = default);
-
-    Task<int> CountByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default);
-
-    Task<int> CountMfaEnabledAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default);
 
     Task<int> CountTotalAsync(CancellationToken cancellationToken = default);
 

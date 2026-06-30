@@ -15,11 +15,13 @@ public sealed class Tenant : AggregateRoot
         Guid id,
         TenantName name,
         TenantSlug slug,
+        TenantPlan plan,
         DateTime createdAtUtc)
         : base(id)
     {
         Name = name;
         Slug = slug;
+        Plan = plan;
         Status = TenantStatus.Provisioning;
         CreatedAtUtc = createdAtUtc;
     }
@@ -28,9 +30,17 @@ public sealed class Tenant : AggregateRoot
 
     public TenantSlug Slug { get; private set; } = null!;
 
+    public TenantPlan Plan { get; private set; }
+
     public TenantStatus Status { get; private set; }
 
     public DateTime CreatedAtUtc { get; private set; }
+
+    public DateTime? UpdatedAtUtc { get; private set; }
+
+    public DateTime? ActivatedAtUtc { get; private set; }
+
+    public DateTime? SuspendedAtUtc { get; private set; }
 
     public IReadOnlyCollection<TenantMembership> Memberships => _memberships.AsReadOnly();
 
@@ -39,75 +49,85 @@ public sealed class Tenant : AggregateRoot
     public static Result<Tenant> Create(
         TenantName name,
         TenantSlug slug,
+        TenantPlan plan,
         DateTime createdAtUtc)
     {
-        var tenant = new Tenant(Guid.NewGuid(), name, slug, createdAtUtc);
+        var tenant = new Tenant(Guid.NewGuid(), name, slug, plan, createdAtUtc);
 
         return Result<Tenant>.Success(tenant);
     }
 
-    public Result Activate()
+    public Result Activate(DateTime activatedAtUtc)
     {
-        if (Status != TenantStatus.Provisioning)
+        if (Status != TenantStatus.Provisioning && Status != TenantStatus.Suspended)
             return Result.Failure(TenantErrors.InvalidStatusTransition);
 
         Status = TenantStatus.Active;
+        ActivatedAtUtc = activatedAtUtc;
+        UpdatedAtUtc = activatedAtUtc;
 
         return Result.Success();
     }
 
-    public Result Rename(TenantName name)
+    public Result Rename(TenantName name, DateTime updatedAtUtc)
     {
-        if (Status == TenantStatus.Disabled)
-            return Result.Failure(TenantErrors.AlreadyDisabled);
+        if (Status == TenantStatus.Deleted)
+            return Result.Failure(TenantErrors.AlreadyDeleted);
 
         Name = name;
+        UpdatedAtUtc = updatedAtUtc;
 
         return Result.Success();
     }
 
-    public Result ChangeSlug(TenantSlug slug)
+    public Result ChangeSlug(TenantSlug slug, DateTime updatedAtUtc)
     {
-        if (Status == TenantStatus.Disabled)
-            return Result.Failure(TenantErrors.AlreadyDisabled);
+        if (Status == TenantStatus.Deleted)
+            return Result.Failure(TenantErrors.AlreadyDeleted);
 
         Slug = slug;
+        UpdatedAtUtc = updatedAtUtc;
 
         return Result.Success();
     }
 
-    public Result Suspend()
+    public Result Suspend(DateTime suspendedAtUtc)
     {
         if (Status == TenantStatus.Suspended)
             return Result.Failure(TenantErrors.AlreadySuspended);
 
-        if (Status == TenantStatus.Disabled)
-            return Result.Failure(TenantErrors.AlreadyDisabled);
+        if (Status == TenantStatus.Deleted)
+            return Result.Failure(TenantErrors.AlreadyDeleted);
 
         Status = TenantStatus.Suspended;
+        SuspendedAtUtc = suspendedAtUtc;
+        UpdatedAtUtc = suspendedAtUtc;
 
         return Result.Success();
     }
 
-    public Result Reactivate()
+    public Result Reactivate(DateTime reactivatedAtUtc)
     {
         if (Status == TenantStatus.Active)
             return Result.Failure(TenantErrors.AlreadyActive);
 
-        if (Status == TenantStatus.Disabled)
-            return Result.Failure(TenantErrors.CannotReactivateDisabled);
+        if (Status == TenantStatus.Deleted)
+            return Result.Failure(TenantErrors.CannotReactivateDeleted);
 
         Status = TenantStatus.Active;
+        ActivatedAtUtc = reactivatedAtUtc;
+        UpdatedAtUtc = reactivatedAtUtc;
 
         return Result.Success();
     }
 
-    public Result Disable()
+    public Result Delete(DateTime deletedAtUtc)
     {
-        if (Status == TenantStatus.Disabled)
-            return Result.Failure(TenantErrors.AlreadyDisabled);
+        if (Status == TenantStatus.Deleted)
+            return Result.Failure(TenantErrors.AlreadyDeleted);
 
-        Status = TenantStatus.Disabled;
+        Status = TenantStatus.Deleted;
+        UpdatedAtUtc = deletedAtUtc;
 
         return Result.Success();
     }

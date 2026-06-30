@@ -35,7 +35,10 @@ internal static class UserEndpoints
             int pageSize = 20,
             CancellationToken ct = default) =>
         {
-            var query = new GetUsersQuery(currentUser.TenantId, page, pageSize);
+            if (!currentUser.TenantId.HasValue)
+                return Results.Forbid();
+
+            var query = new GetUsersQuery(currentUser.TenantId.Value, page, pageSize);
             var result = await handler.Handle(query, ct);
 
             return result.IsSuccess

@@ -19,11 +19,14 @@ using ZeroTrustSaaS.Application.Features.Identity.Mfa;
 using ZeroTrustSaaS.Application.Features.Identity.RefreshToken;
 using ZeroTrustSaaS.Application.Features.Identity.Register;
 using ZeroTrustSaaS.Application.Features.Identity.UnlockUser;
-using ZeroTrustSaaS.Application.Features.Tenants.CreateTenant;
-using ZeroTrustSaaS.Application.Features.Tenants.GetTenant;
 using ZeroTrustSaaS.Application.Features.Platform.CheckPlatformStatus;
 using ZeroTrustSaaS.Application.Features.Platform.InitializePlatform;
+using ZeroTrustSaaS.Application.Features.Tenants.ActivateTenant;
+using ZeroTrustSaaS.Application.Features.Tenants.CreateTenant;
+using ZeroTrustSaaS.Application.Features.Tenants.GetTenant;
+using ZeroTrustSaaS.Application.Features.Tenants.GetTenantUsers;
 using ZeroTrustSaaS.Application.Features.Tenants.GetTenants;
+using ZeroTrustSaaS.Application.Features.Tenants.SuspendTenant;
 
 namespace ZeroTrustSaaS.Application;
 
@@ -44,6 +47,8 @@ public static class DependencyInjection
         services.AddScoped<RevokeDeviceCommandHandler>();
         services.AddScoped<BlockDeviceCommandHandler>();
         services.AddScoped<CreateTenantCommandHandler>();
+        services.AddScoped<SuspendTenantCommandHandler>();
+        services.AddScoped<ActivateTenantCommandHandler>();
         services.AddScoped<AssignRoleCommandHandler>();
         services.AddScoped<CreateRoleCommandHandler>();
         services.AddScoped<AssignPermissionToRoleCommandHandler>();
@@ -55,6 +60,7 @@ public static class DependencyInjection
         services.AddScoped<GetUsersQueryHandler>();
         services.AddScoped<GetTenantsQueryHandler>();
         services.AddScoped<GetTenantQueryHandler>();
+        services.AddScoped<GetTenantUsersQueryHandler>();
         services.AddScoped<GetDevicesQueryHandler>();
         services.AddScoped<GetRolesQueryHandler>();
         services.AddScoped<GetPermissionsQueryHandler>();

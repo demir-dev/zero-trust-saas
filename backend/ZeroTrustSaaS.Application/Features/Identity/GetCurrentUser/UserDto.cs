@@ -2,8 +2,8 @@ namespace ZeroTrustSaaS.Application.Features.Identity.GetCurrentUser;
 
 public sealed record UserDto(
     Guid Id,
-    Guid TenantId,
     string Email,
+    string DisplayName,
     string Status,
     bool IsEmailConfirmed,
     bool IsMfaEnabled,

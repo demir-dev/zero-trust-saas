@@ -67,7 +67,7 @@ public sealed class TrustDeviceCommandHandler(
             AuditSeverity.Info,
             now,
             userId: command.UserId,
-            tenantId: user.TenantId,
+            tenantId: null,
             ipAddress: ipResult.IsSuccess ? ipResult.Value : null);
 
         if (logResult.IsSuccess)
