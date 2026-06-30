@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import {
   Box, Grid, Card, CardContent, Typography, Button, Chip, List,
-  ListItem, ListItemText, Divider, Skeleton, Drawer, TextField, Stack, Select,
-  MenuItem, FormControl, InputLabel
+  ListItem, Divider, Skeleton, Dialog, DialogTitle, DialogContent,
+  DialogActions, TextField, Stack, Select, MenuItem, FormControl, InputLabel
 } from '@mui/material'
 import { Add as AddIcon, AdminPanelSettings as RolesIcon, Key as KeyIcon } from '@mui/icons-material'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -23,9 +23,10 @@ function useRoles() {
 
 export default function RolesPage() {
   const [selected, setSelected] = useState(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [permDrawerOpen, setPermDrawerOpen] = useState(false)
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false)
+  const [permDialogOpen, setPermDialogOpen] = useState(false)
   const [createError, setCreateError] = useState(null)
+  const [permError, setPermError] = useState(null)
   const queryClient = useQueryClient()
   const { data: roles, isLoading } = useRoles()
 
@@ -34,16 +35,39 @@ export default function RolesPage() {
 
   const createRoleMutation = useMutation({
     mutationFn: (body) => api.post('/authorization/roles', body),
-    onSuccess: () => { queryClient.invalidateQueries(['roles']); setDrawerOpen(false); resetRole() },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['roles'])
+      setRoleDialogOpen(false)
+      resetRole()
+      setCreateError(null)
+    },
     onError: (err) => setCreateError(err),
   })
 
   const assignPermMutation = useMutation({
     mutationFn: ({ id, code }) => api.post(`/authorization/roles/${id}/permissions`, { permissionCode: code }),
-    onSuccess: () => { queryClient.invalidateQueries(['roles']); setPermDrawerOpen(false); resetPerm() },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['roles'])
+      setPermDialogOpen(false)
+      resetPerm()
+      setPermError(null)
+    },
+    onError: (err) => setPermError(err),
   })
 
   const selectedRole = roles?.find(r => r.id === selected)
+
+  const handleCloseRoleDialog = () => {
+    setRoleDialogOpen(false)
+    resetRole()
+    setCreateError(null)
+  }
+
+  const handleClosePermDialog = () => {
+    setPermDialogOpen(false)
+    resetPerm()
+    setPermError(null)
+  }
 
   return (
     <motion.div variants={pageVariants} initial="initial" animate="animate">
@@ -51,7 +75,7 @@ export default function RolesPage() {
         title="Roles & Permissions"
         subtitle="Manage access control for your organization"
         action={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDrawerOpen(true)}>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setRoleDialogOpen(true)}>
             New Role
           </Button>
         }
@@ -110,7 +134,7 @@ export default function RolesPage() {
                       </Typography>
                     </Box>
                     {!selectedRole.isSystem && (
-                      <Button size="small" startIcon={<AddIcon />} onClick={() => setPermDrawerOpen(true)}>
+                      <Button size="small" startIcon={<AddIcon />} onClick={() => setPermDialogOpen(true)}>
                         Add Permission
                       </Button>
                     )}
@@ -134,44 +158,56 @@ export default function RolesPage() {
         </Grid>
       </Grid>
 
-      <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 380 }, p: 3 } }}
-      >
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Create Role</Typography>
-        <ProblemAlert error={createError} />
+      <Dialog open={roleDialogOpen} onClose={handleCloseRoleDialog} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Create Role</DialogTitle>
         <Box component="form" onSubmit={hsRole((d) => createRoleMutation.mutate(d))}>
-          <Stack spacing={2}>
-            <TextField label="Role Name" {...regRole('name', { required: true })} error={!!roleErrors.name} helperText={roleErrors.name && 'Required'} />
-            <FormControl>
-              <InputLabel>Scope</InputLabel>
-              <Select defaultValue="Tenant" {...regRole('scope')} label="Scope">
-                <MenuItem value="Global">Global</MenuItem>
-                <MenuItem value="Tenant">Tenant</MenuItem>
-                <MenuItem value="User">User</MenuItem>
-              </Select>
-            </FormControl>
-            <TextField label="Tenant ID (optional)" {...regRole('tenantId')} placeholder="UUID" />
-            <Button type="submit" variant="contained" size="large" disabled={createRoleMutation.isPending} fullWidth>
+          <DialogContent>
+            <ProblemAlert error={createError} />
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField label="Role Name" {...regRole('name', { required: true })} error={!!roleErrors.name} helperText={roleErrors.name && 'Required'} fullWidth />
+              <FormControl fullWidth>
+                <InputLabel>Scope</InputLabel>
+                <Select defaultValue="Tenant" {...regRole('scope')} label="Scope">
+                  <MenuItem value="Global">Global</MenuItem>
+                  <MenuItem value="Tenant">Tenant</MenuItem>
+                  <MenuItem value="User">User</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField label="Tenant ID (optional)" {...regRole('tenantId')} placeholder="UUID" fullWidth />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={handleCloseRoleDialog} color="inherit">Cancel</Button>
+            <Button type="submit" variant="contained" disabled={createRoleMutation.isPending}>
               {createRoleMutation.isPending ? 'Creating…' : 'Create Role'}
             </Button>
-          </Stack>
+          </DialogActions>
         </Box>
-      </Drawer>
+      </Dialog>
 
-      <Drawer anchor="right" open={permDrawerOpen} onClose={() => setPermDrawerOpen(false)}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 380 }, p: 3 } }}
-      >
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Assign Permission</Typography>
+      <Dialog open={permDialogOpen} onClose={handleClosePermDialog} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Assign Permission</DialogTitle>
         <Box component="form" onSubmit={hsPerm((d) => assignPermMutation.mutate({ id: selected, code: d.permissionCode }))}>
-          <Stack spacing={2}>
-            <TextField label="Permission Code" placeholder="users.read" {...regPerm('permissionCode', { required: true })}
-              helperText="Format: resource.action (e.g. users.read)" />
-            <Button type="submit" variant="contained" disabled={assignPermMutation.isPending} fullWidth>
+          <DialogContent>
+            <ProblemAlert error={permError} />
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField
+                label="Permission Code"
+                placeholder="users.read"
+                {...regPerm('permissionCode', { required: true })}
+                helperText="Format: resource.action (e.g. users.read)"
+                fullWidth
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={handleClosePermDialog} color="inherit">Cancel</Button>
+            <Button type="submit" variant="contained" disabled={assignPermMutation.isPending}>
               {assignPermMutation.isPending ? 'Assigning…' : 'Assign Permission'}
             </Button>
-          </Stack>
+          </DialogActions>
         </Box>
-      </Drawer>
+      </Dialog>
     </motion.div>
   )
 }
