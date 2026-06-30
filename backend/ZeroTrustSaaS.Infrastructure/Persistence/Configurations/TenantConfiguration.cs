@@ -38,9 +38,5 @@ internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
 
         builder.Property(t => t.CreatedAtUtc).IsRequired();
 
-        builder.HasMany<TenantMembership>()
-            .WithOne()
-            .HasForeignKey(tm => tm.TenantId)
-            .OnDelete(DeleteBehavior.Cascade);
     }
 }

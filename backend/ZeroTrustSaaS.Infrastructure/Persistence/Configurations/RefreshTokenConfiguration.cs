@@ -60,6 +60,13 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
                 .IsRequired();
         });
 
+        builder.OwnsOne(rt => rt.RevokedByIp, ip =>
+        {
+            ip.Property(i => i.Value)
+                .HasColumnName("revoked_by_ip")
+                .HasMaxLength(45);
+        });
+
         builder.Property(rt => rt.RevocationReason)
             .HasConversion<int>()
             .IsRequired();

@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: zero_trust_saas
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zerotrust_network
+
+  api:
+    build:
+      context: backend
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=zero_trust_saas;Username=postgres;Password=postgres"
+      Jwt__SecretKey: "local-development-secret-key-change-me-32ch"
+      Jwt__Issuer: ZeroTrustSaaS
+      Jwt__Audience: ZeroTrustSaaS
+      Jwt__ExpirationMinutes: "60"
+      AllowedOrigins: "http://localhost:5173"
+    ports:
+      - "8080:8080"
+    networks:
+      - zerotrust_network
+
+  frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    depends_on:
+      - api
+    environment:
+      VITE_API_URL: "http://localhost:8080"
+      VITE_API_PROXY_TARGET: "http://api:8080"
+    ports:
+      - "5173:5173"
+    networks:
+      - zerotrust_network
+
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@zerotrust.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - zerotrust_network
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+
+networks:
+  zerotrust_network:
+    driver: bridge

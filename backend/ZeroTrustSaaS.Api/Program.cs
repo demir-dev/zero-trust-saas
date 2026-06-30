@@ -5,7 +5,9 @@ using ZeroTrustSaaS.Api.Endpoints;
 using ZeroTrustSaaS.Api.Services;
 using ZeroTrustSaaS.Application;
 using ZeroTrustSaaS.Application.Abstractions.Services;
+using Microsoft.EntityFrameworkCore;
 using ZeroTrustSaaS.Infrastructure;
+using ZeroTrustSaaS.Infrastructure.Persistence;
 using ZeroTrustSaaS.Infrastructure.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -53,10 +55,19 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
+
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
 
 app.MapAuthEndpoints();
 app.MapDeviceEndpoints();
