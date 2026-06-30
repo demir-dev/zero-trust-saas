@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async ({ organizationSlug, email, password, ...deviceInfo }) => {
     const res = await api.post('/auth/login', {
-      tenantSlug: organizationSlug,
+      tenantSlug: organizationSlug?.trim() || null,
       email,
       password,
       ...deviceInfo,

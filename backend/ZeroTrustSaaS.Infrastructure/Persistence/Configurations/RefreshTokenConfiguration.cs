@@ -14,6 +14,8 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
 
         builder.Property(rt => rt.UserId).IsRequired();
 
+        builder.Property(rt => rt.TenantId);
+
         builder.OwnsOne(rt => rt.TokenHash, th =>
         {
             th.Property(h => h.Value)

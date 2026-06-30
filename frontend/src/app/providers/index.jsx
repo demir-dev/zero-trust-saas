@@ -25,7 +25,7 @@ export function usePlatformStatus() {
 function PlatformStatusProvider({ children }) {
   const { data, isLoading } = useQuery({
     queryKey: ['platform', 'status'],
-    queryFn: () => api.get('/platform/status').then((r) => r.data),
+    queryFn: () => api.get('/setup/status').then((r) => r.data),
     staleTime: Infinity,
     retry: 1,
     gcTime: Infinity,

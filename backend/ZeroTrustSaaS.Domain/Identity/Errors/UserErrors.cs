@@ -5,11 +5,6 @@ namespace ZeroTrustSaaS.Domain.Identity.Errors;
 public static class UserErrors
 {
     // Registration
-    public static readonly Error InvalidTenantId =
-        Error.Failure(
-            "Users.InvalidTenantId",
-            "The tenant identifier is invalid.");
-
     public static readonly Error EmailAlreadyExists =
         Error.Conflict(
             "Users.EmailAlreadyExists",

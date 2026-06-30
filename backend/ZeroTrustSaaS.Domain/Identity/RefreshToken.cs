@@ -15,6 +15,7 @@ public sealed class RefreshToken : Entity
     private RefreshToken(
         Guid id,
         Guid userId,
+        Guid? tenantId,
         RefreshTokenHash tokenHash,
         ClientInfo issuedClient,
         DateTime issuedAtUtc,
@@ -22,6 +23,7 @@ public sealed class RefreshToken : Entity
         : base(id)
     {
         UserId = userId;
+        TenantId = tenantId;
         TokenHash = tokenHash;
         IssuedClient = issuedClient;
         IssuedAtUtc = issuedAtUtc;
@@ -29,6 +31,9 @@ public sealed class RefreshToken : Entity
     }
 
     public Guid UserId { get; private set; }
+
+    // Null = platform-context token; set = tenant-context token.
+    public Guid? TenantId { get; private set; }
 
     public RefreshTokenHash TokenHash { get; private set; } = null!;
 
@@ -67,7 +72,8 @@ public sealed class RefreshToken : Entity
         RefreshTokenHash tokenHash,
         ClientInfo issuedClient,
         DateTime issuedAtUtc,
-        DateTime expiresAtUtc)
+        DateTime expiresAtUtc,
+        Guid? tenantId = null)
     {
         if (expiresAtUtc <= issuedAtUtc)
         {
@@ -78,6 +84,7 @@ public sealed class RefreshToken : Entity
         var token = new RefreshToken(
             Guid.NewGuid(),
             userId,
+            tenantId,
             tokenHash,
             issuedClient,
             issuedAtUtc,

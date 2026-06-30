@@ -22,7 +22,6 @@ public sealed class User : SecureAggregateRoot
 
     private User(
         Guid id,
-        Guid tenantId,
         Email email,
         PasswordHash passwordHash,
         DateTime createdAtUtc,
@@ -30,7 +29,6 @@ public sealed class User : SecureAggregateRoot
         string? lastName)
         : base(id)
     {
-        TenantId = tenantId;
         Email = email;
         PasswordHash = passwordHash;
         FirstName = firstName;
@@ -42,8 +40,6 @@ public sealed class User : SecureAggregateRoot
         RegisteredAtUtc = createdAtUtc;
         PasswordChangedAtUtc = createdAtUtc;
     }
-
-    public Guid TenantId { get; private set; }
 
     public string? FirstName { get; private set; }
 
@@ -94,19 +90,14 @@ public sealed class User : SecureAggregateRoot
         !IsLocked;
 
     public static Result<User> Register(
-        Guid tenantId,
         Email email,
         PasswordHash passwordHash,
         DateTime createdAtUtc,
         string? firstName = null,
         string? lastName = null)
     {
-        if (tenantId == Guid.Empty)
-            return Result<User>.Failure(UserErrors.InvalidTenantId);
-
         var user = new User(
             Guid.NewGuid(),
-            tenantId,
             email,
             passwordHash,
             createdAtUtc,

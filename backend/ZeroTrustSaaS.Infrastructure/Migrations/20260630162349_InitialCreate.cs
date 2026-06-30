@@ -45,6 +45,19 @@ namespace ZeroTrustSaaS.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "platform_configuration",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    IsInitialized = table.Column<bool>(type: "boolean", nullable: false),
+                    InitializedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_platform_configuration", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "roles",
                 columns: table => new
                 {
@@ -66,8 +79,12 @@ namespace ZeroTrustSaaS.Infrastructure.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     slug = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Plan = table.Column<int>(type: "integer", nullable: false),
                     Status = table.Column<int>(type: "integer", nullable: false),
-                    CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    ActivatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    SuspendedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -122,7 +139,8 @@ namespace ZeroTrustSaaS.Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    first_name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    last_name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     email = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
                     password_hash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     Status = table.Column<int>(type: "integer", nullable: false),
@@ -175,8 +193,13 @@ namespace ZeroTrustSaaS.Infrastructure.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     TenantId = table.Column<Guid>(type: "uuid", nullable: false),
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    IsOwner = table.Column<bool>(type: "boolean", nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false),
                     JoinedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    IsOwner = table.Column<bool>(type: "boolean", nullable: false)
+                    AcceptedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    InvitedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -221,6 +244,7 @@ namespace ZeroTrustSaaS.Infrastructure.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: true),
                     token_hash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     device_fingerprint = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
                     issued_ip = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: false),
@@ -309,6 +333,12 @@ namespace ZeroTrustSaaS.Infrastructure.Migrations
                 name: "ix_user_roles_user_role_tenant",
                 table: "user_roles",
                 columns: new[] { "UserId", "RoleId", "TenantId" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_users_email",
+                table: "users",
+                column: "email",
+                unique: true);
         }
 
         /// <inheritdoc />
@@ -322,6 +352,9 @@ namespace ZeroTrustSaaS.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "permissions");
+
+            migrationBuilder.DropTable(
+                name: "platform_configuration");
 
             migrationBuilder.DropTable(
                 name: "refresh_tokens");

@@ -12,17 +12,17 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasKey(u => u.Id);
 
-        builder.Property(u => u.TenantId)
-            .IsRequired();
-
         builder.OwnsOne(u => u.Email, email =>
         {
             email.Property(e => e.Value)
                 .HasColumnName("email")
                 .HasMaxLength(320)
                 .IsRequired();
-        });
 
+            email.HasIndex(e => e.Value)
+                .IsUnique()
+                .HasDatabaseName("ix_users_email");
+        });
 
         builder.OwnsOne(u => u.PasswordHash, ph =>
         {
@@ -69,6 +69,5 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(100);
 
         builder.Property(u => u.Version).IsRequired();
-
     }
 }

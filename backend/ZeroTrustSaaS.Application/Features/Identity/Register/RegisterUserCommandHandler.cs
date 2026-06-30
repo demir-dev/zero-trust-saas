@@ -9,7 +9,6 @@ namespace ZeroTrustSaaS.Application.Features.Identity.Register;
 
 public sealed class RegisterUserCommandHandler(
     IUserRepository userRepository,
-    ITenantRepository tenantRepository,
     IPasswordHasher passwordHasher,
     IDateTimeProvider dateTimeProvider,
     IUnitOfWork unitOfWork)
@@ -18,35 +17,25 @@ public sealed class RegisterUserCommandHandler(
         RegisterUserCommand command,
         CancellationToken cancellationToken = default)
     {
-        var tenant = await tenantRepository.GetByIdAsync(command.TenantId, cancellationToken);
-
-        if (tenant is null)
-            return Result<Guid>.Failure(UserErrors.InvalidTenantId);
-
         var emailResult = Email.Create(command.Email);
-
         if (emailResult.IsFailure)
             return Result<Guid>.Failure(emailResult.Error);
 
-        bool emailExists = await userRepository.ExistsByEmailAsync(
-            command.Email,
-            command.TenantId,
-            cancellationToken);
-
+        bool emailExists = await userRepository.ExistsByEmailAsync(command.Email, cancellationToken);
         if (emailExists)
             return Result<Guid>.Failure(UserErrors.EmailAlreadyExists);
 
         string hash = passwordHasher.Hash(command.Password);
         var passwordHashResult = PasswordHash.Create(hash);
-
         if (passwordHashResult.IsFailure)
             return Result<Guid>.Failure(passwordHashResult.Error);
 
         var userResult = User.Register(
-            command.TenantId,
             emailResult.Value,
             passwordHashResult.Value,
-            dateTimeProvider.UtcNow);
+            dateTimeProvider.UtcNow,
+            command.FirstName,
+            command.LastName);
 
         if (userResult.IsFailure)
             return Result<Guid>.Failure(userResult.Error);

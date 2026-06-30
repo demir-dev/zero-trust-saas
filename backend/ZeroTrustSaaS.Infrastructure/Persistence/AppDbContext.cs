@@ -3,6 +3,7 @@ using ZeroTrustSaaS.Domain.Audit;
 using ZeroTrustSaaS.Domain.Authorization;
 using ZeroTrustSaaS.Domain.Devices;
 using ZeroTrustSaaS.Domain.Identity;
+using ZeroTrustSaaS.Domain.Platform;
 using ZeroTrustSaaS.Domain.Tenants;
 
 namespace ZeroTrustSaaS.Infrastructure.Persistence;
@@ -28,6 +29,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<UserRole> UserRoles => Set<UserRole>();
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
+    public DbSet<PlatformConfiguration> PlatformConfigurations => Set<PlatformConfiguration>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

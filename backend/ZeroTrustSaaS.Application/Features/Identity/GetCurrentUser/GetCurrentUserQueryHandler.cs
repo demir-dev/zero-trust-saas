@@ -17,8 +17,8 @@ public sealed class GetCurrentUserQueryHandler(IUserRepository userRepository)
 
         var dto = new UserDto(
             user.Id,
-            user.TenantId,
             user.Email.Value,
+            user.DisplayName,
             user.Status.ToString(),
             user.IsEmailConfirmed,
             user.IsMfaEnabled,

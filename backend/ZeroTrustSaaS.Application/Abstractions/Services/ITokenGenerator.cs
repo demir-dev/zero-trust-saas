@@ -2,7 +2,14 @@ namespace ZeroTrustSaaS.Application.Abstractions.Services;
 
 public interface ITokenGenerator
 {
-    string GenerateJwtToken(Guid userId, Guid tenantId, IEnumerable<string> roles);
+    string GenerateJwtToken(
+        Guid userId,
+        string email,
+        string securityStamp,
+        IEnumerable<string> platformRoles,
+        Guid? tenantId,
+        string? tenantRole,
+        IEnumerable<string> permissions);
 
     /// <summary>
     /// Generates a cryptographically secure random refresh token value.

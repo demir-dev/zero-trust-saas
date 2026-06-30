@@ -42,7 +42,7 @@ public sealed class EnableMfaCommandHandler(
             AuditSeverity.High,
             now,
             userId: user.Id,
-            tenantId: user.TenantId);
+            tenantId: null);
 
         if (logResult.IsSuccess)
             await auditLogRepository.AddAsync(logResult.Value, cancellationToken);

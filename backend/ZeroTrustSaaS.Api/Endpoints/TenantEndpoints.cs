@@ -1,5 +1,4 @@
 using ZeroTrustSaaS.Api.Helpers;
-using ZeroTrustSaaS.Application.Features.Tenants.CreateTenant;
 using ZeroTrustSaaS.Application.Features.Tenants.GetTenant;
 using ZeroTrustSaaS.Application.Features.Tenants.GetTenants;
 
@@ -9,7 +8,9 @@ internal static class TenantEndpoints
 {
     internal static void MapTenantEndpoints(this WebApplication app)
     {
-        var group = app.MapGroup("/tenants").WithTags("Tenants");
+        var group = app.MapGroup("/tenants")
+            .WithTags("Tenants")
+            .RequireAuthorization();
 
         group.MapGet("/", async (
             GetTenantsQueryHandler handler,
@@ -23,7 +24,7 @@ internal static class TenantEndpoints
             return result.IsSuccess
                 ? Results.Ok(result.Value)
                 : ApiErrors.Problem(result.Error);
-        }).RequireAuthorization();
+        });
 
         group.MapGet("/{id:guid}", async (
             Guid id,
@@ -36,28 +37,6 @@ internal static class TenantEndpoints
             return result.IsSuccess
                 ? Results.Ok(result.Value)
                 : ApiErrors.Problem(result.Error);
-        }).RequireAuthorization();
-
-        group.MapPost("/", async (
-            CreateTenantRequest request,
-            CreateTenantCommandHandler handler,
-            CancellationToken ct) =>
-        {
-            var command = new CreateTenantCommand(
-                request.Name,
-                request.Slug,
-                request.OwnerUserId);
-
-            var result = await handler.Handle(command, ct);
-
-            return result.IsSuccess
-                ? Results.Created($"/tenants/{result.Value}", new { id = result.Value })
-                : ApiErrors.Problem(result.Error);
-        }).RequireAuthorization();
+        });
     }
 }
-
-internal sealed record CreateTenantRequest(
-    string Name,
-    string Slug,
-    Guid OwnerUserId);

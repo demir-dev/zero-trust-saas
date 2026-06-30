@@ -1,7 +1,7 @@
 namespace ZeroTrustSaaS.Application.Features.Identity.Login;
 
 public sealed record LoginCommand(
-    string TenantSlug,
+    string? TenantSlug,
     string Email,
     string Password,
     string IpAddress,

@@ -12,56 +12,16 @@ internal sealed class UserRepository(AppDbContext dbContext) : IUserRepository
             .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
     }
 
-    public Task<User?> GetByEmailAsync(
-        string email,
-        Guid tenantId,
-        CancellationToken cancellationToken = default)
+    public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         return dbContext.Users
-            .FirstOrDefaultAsync(
-                u => u.Email.Value == email && u.TenantId == tenantId,
-                cancellationToken);
+            .FirstOrDefaultAsync(u => u.Email.Value == email, cancellationToken);
     }
 
-    public Task<bool> ExistsByEmailAsync(
-        string email,
-        Guid tenantId,
-        CancellationToken cancellationToken = default)
+    public Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         return dbContext.Users
-            .AnyAsync(
-                u => u.Email.Value == email && u.TenantId == tenantId,
-                cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<User>> GetByTenantIdAsync(
-        Guid tenantId,
-        int page,
-        int pageSize,
-        CancellationToken cancellationToken = default)
-    {
-        return await dbContext.Users
-            .Where(u => u.TenantId == tenantId)
-            .OrderBy(u => u.RegisteredAtUtc)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
-    }
-
-    public Task<int> CountByTenantAsync(
-        Guid tenantId,
-        CancellationToken cancellationToken = default)
-    {
-        return dbContext.Users
-            .CountAsync(u => u.TenantId == tenantId, cancellationToken);
-    }
-
-    public Task<int> CountMfaEnabledAsync(
-        Guid tenantId,
-        CancellationToken cancellationToken = default)
-    {
-        return dbContext.Users
-            .CountAsync(u => u.TenantId == tenantId && u.IsMfaEnabled, cancellationToken);
+            .AnyAsync(u => u.Email.Value == email, cancellationToken);
     }
 
     public Task<int> CountTotalAsync(CancellationToken cancellationToken = default)

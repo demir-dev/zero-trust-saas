@@ -30,14 +30,11 @@ public sealed class GetSecurityOverviewQueryHandler(
             SecurityEventType.LoginFailed,
             query.TenantId,
             cancellationToken);
-        int mfaEnabled = query.TenantId.HasValue
-            ? await userRepository.CountMfaEnabledAsync(query.TenantId.Value, cancellationToken)
-            : 0;
 
         var dto = new SecurityOverviewDto(
             totalTenants,
             totalUsers,
-            mfaEnabled,
+            0,
             trustedDevices,
             revokedDevices,
             blockedDevices,

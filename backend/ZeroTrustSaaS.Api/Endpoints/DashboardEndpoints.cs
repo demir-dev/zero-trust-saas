@@ -18,11 +18,7 @@ internal static class DashboardEndpoints
             ICurrentUserContext currentUser,
             CancellationToken ct) =>
         {
-            var tenantId = currentUser.TenantId == Guid.Empty
-                ? (Guid?)null
-                : currentUser.TenantId;
-
-            var query = new GetSecurityOverviewQuery(tenantId);
+            var query = new GetSecurityOverviewQuery(currentUser.TenantId);
             var result = await handler.Handle(query, ct);
 
             return result.IsSuccess
@@ -37,11 +33,7 @@ internal static class DashboardEndpoints
             int pageSize = 50,
             CancellationToken ct = default) =>
         {
-            var tenantId = currentUser.TenantId == Guid.Empty
-                ? (Guid?)null
-                : currentUser.TenantId;
-
-            var query = new GetAuditLogsQuery(tenantId, null, page, pageSize);
+            var query = new GetAuditLogsQuery(currentUser.TenantId, null, page, pageSize);
             var result = await handler.Handle(query, ct);
 
             return result.IsSuccess

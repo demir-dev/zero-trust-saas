@@ -2,6 +2,7 @@ using ZeroTrustSaaS.Application.Abstractions.Persistence;
 using ZeroTrustSaaS.Application.Abstractions.Repositories;
 using ZeroTrustSaaS.Application.Abstractions.Services;
 using ZeroTrustSaaS.Domain.Audit;
+using ZeroTrustSaaS.Domain.Authorization;
 using ZeroTrustSaaS.Domain.Common;
 using ZeroTrustSaaS.Domain.Devices;
 using ZeroTrustSaaS.Domain.Identity;
@@ -16,6 +17,8 @@ namespace ZeroTrustSaaS.Application.Features.Identity.Login;
 public sealed class LoginCommandHandler(
     IUserRepository userRepository,
     ITenantRepository tenantRepository,
+    ITenantMembershipRepository membershipRepository,
+    IRoleRepository roleRepository,
     IAuditLogRepository auditLogRepository,
     IPasswordHasher passwordHasher,
     ITokenGenerator tokenGenerator,
@@ -28,18 +31,26 @@ public sealed class LoginCommandHandler(
         LoginCommand command,
         CancellationToken cancellationToken = default)
     {
-        // Slug lookup — generic error on failure to prevent tenant enumeration
-        var normalizedSlug = command.TenantSlug.Trim().ToLowerInvariant();
-        var tenant = await tenantRepository.GetBySlugAsync(normalizedSlug, cancellationToken);
-        if (tenant is null || !tenant.IsActive)
-            return Result<LoginResponse>.Failure(UserErrors.InvalidCredentials);
-
-        var user = await userRepository.GetByEmailAsync(
-            command.Email,
-            tenant.Id,
-            cancellationToken);
-
         var now = dateTimeProvider.UtcNow;
+
+        // Platform login when no slug is provided; tenant login otherwise.
+        bool isTenantLogin = !string.IsNullOrWhiteSpace(command.TenantSlug);
+
+        Guid? tenantId = null;
+
+        if (isTenantLogin)
+        {
+            var normalizedSlug = command.TenantSlug!.Trim().ToLowerInvariant();
+            var tenant = await tenantRepository.GetBySlugAsync(normalizedSlug, cancellationToken);
+
+            // Generic error — do not reveal whether slug exists (prevents tenant enumeration).
+            if (tenant is null || !tenant.IsActive)
+                return Result<LoginResponse>.Failure(UserErrors.InvalidCredentials);
+
+            tenantId = tenant.Id;
+        }
+
+        var user = await userRepository.GetByEmailAsync(command.Email, cancellationToken);
 
         if (user is null || !passwordHasher.Verify(command.Password, user.PasswordHash.Value))
         {
@@ -61,7 +72,7 @@ public sealed class LoginCommandHandler(
                     AuditSeverity.Warning,
                     now,
                     user.Id,
-                    user.TenantId,
+                    tenantId,
                     failedAuditIp.IsSuccess ? failedAuditIp.Value : null,
                     command.UserAgent,
                     auditLogRepository,
@@ -71,18 +82,21 @@ public sealed class LoginCommandHandler(
             }
 
             await unitOfWork.SaveChangesAsync(cancellationToken);
-
             return Result<LoginResponse>.Failure(UserErrors.InvalidCredentials);
         }
 
         if (!user.CanAuthenticate)
         {
-            var loginResult = user.IsLocked
-                ? LoginResult.Locked
-                : LoginResult.Suspended;
-
             return Result<LoginResponse>.Failure(
                 user.IsLocked ? UserErrors.UserIsLocked : UserErrors.UserIsSuspended);
+        }
+
+        // For tenant login, validate an active membership exists.
+        if (isTenantLogin)
+        {
+            var membership = await membershipRepository.GetAsync(tenantId!.Value, user.Id, cancellationToken);
+            if (membership is null || !membership.IsActive)
+                return Result<LoginResponse>.Failure(UserErrors.InvalidCredentials);
         }
 
         if (user.IsMfaEnabled)
@@ -108,14 +122,14 @@ public sealed class LoginCommandHandler(
                 UserId: user.Id));
         }
 
-        return await IssueTokensAsync(user, command, now, auditLogRepository, cancellationToken);
+        return await IssueTokensAsync(user, command, tenantId, now, cancellationToken);
     }
 
     private async Task<Result<LoginResponse>> IssueTokensAsync(
         User user,
         LoginCommand command,
+        Guid? tenantId,
         DateTime now,
-        IAuditLogRepository auditLogRepository,
         CancellationToken cancellationToken)
     {
         string rawRefreshToken = tokenGenerator.GenerateRefreshTokenValue();
@@ -125,16 +139,14 @@ public sealed class LoginCommandHandler(
         if (tokenHashResult.IsFailure)
             return Result<LoginResponse>.Failure(tokenHashResult.Error);
 
-        // Build a dedicated ClientInfo for the RefreshToken — must not share the
-        // same CLR instance with LoginAttempt; EF tracks owned entities by owner path.
         var tokenClientInfo = BuildClientInfo(command);
-
         var refreshTokenResult = DomainRefreshToken.Create(
             user.Id,
             tokenHashResult.Value,
             tokenClientInfo,
             now,
-            now.Add(RefreshTokenLifetime));
+            now.Add(RefreshTokenLifetime),
+            tenantId);
 
         if (refreshTokenResult.IsFailure)
             return Result<LoginResponse>.Failure(refreshTokenResult.Error);
@@ -143,9 +155,7 @@ public sealed class LoginCommandHandler(
         if (issueResult.IsFailure)
             return Result<LoginResponse>.Failure(issueResult.Error);
 
-        // Build a separate ClientInfo instance for the LoginAttempt aggregate.
         var attemptClientInfo = BuildClientInfo(command);
-
         var successAttemptResult = LoginAttempt.Create(
             user.Id,
             attemptClientInfo,
@@ -156,21 +166,69 @@ public sealed class LoginCommandHandler(
         if (successAttemptResult.IsSuccess)
             user.RecordSuccessfulLogin(successAttemptResult.Value, now);
 
-        string accessToken = tokenGenerator.GenerateJwtToken(
-            user.Id,
-            user.TenantId,
-            []);
+        // Build JWT claims based on login context.
+        string accessToken;
+
+        if (tenantId is null)
+        {
+            // Platform login: emit platform_role claims, no tenant context.
+            var userRoles = await roleRepository.GetUserRolesAsync(user.Id, null, cancellationToken);
+            var platformRoleNames = new List<string>();
+
+            foreach (var ur in userRoles.Where(r => r.IsActive))
+            {
+                var role = await roleRepository.GetByIdAsync(ur.RoleId, cancellationToken);
+                if (role is not null)
+                    platformRoleNames.Add(role.Name.Value);
+            }
+
+            accessToken = tokenGenerator.GenerateJwtToken(
+                user.Id,
+                user.Email.Value,
+                user.SecurityStamp.Value.ToString(),
+                platformRoleNames,
+                tenantId: null,
+                tenantRole: null,
+                permissions: []);
+        }
+        else
+        {
+            // Tenant login: emit tenant_id, tenant_role, permission claims.
+            var userRoles = await roleRepository.GetUserRolesAsync(user.Id, tenantId, cancellationToken);
+            var activeUserRole = userRoles.FirstOrDefault(ur => ur.IsActive);
+
+            string tenantRoleName = string.Empty;
+            var permissionCodes = new List<string>();
+
+            if (activeUserRole is not null)
+            {
+                var role = await roleRepository.GetByIdAsync(activeUserRole.RoleId, cancellationToken);
+                if (role is not null)
+                {
+                    tenantRoleName = role.Name.Value;
+                    permissionCodes.AddRange(role.Permissions.Select(p => p.Code.Value));
+                }
+            }
+
+            accessToken = tokenGenerator.GenerateJwtToken(
+                user.Id,
+                user.Email.Value,
+                user.SecurityStamp.Value.ToString(),
+                platformRoles: [],
+                tenantId: tenantId,
+                tenantRole: tenantRoleName,
+                permissions: permissionCodes);
+        }
 
         userRepository.Update(user);
 
-        // Build a fresh IpAddress for AuditLog — must not share with ClientInfo instances.
         var auditIpResult = IpAddress.Create(command.IpAddress);
         await LogSecurityEvent(
             SecurityEventType.LoginSucceeded,
             AuditSeverity.Info,
             now,
             user.Id,
-            user.TenantId,
+            tenantId,
             auditIpResult.IsSuccess ? auditIpResult.Value : null,
             command.UserAgent,
             auditLogRepository,
@@ -207,7 +265,7 @@ public sealed class LoginCommandHandler(
         AuditSeverity severity,
         DateTime occurredAt,
         Guid userId,
-        Guid tenantId,
+        Guid? tenantId,
         IpAddress? ip,
         string? userAgent,
         IAuditLogRepository auditLogRepository,

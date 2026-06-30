@@ -70,6 +70,10 @@ app.UseAuthorization();
     var db = startupScope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 
+    // Platform configuration sentinel row + platform roles — runs in ALL environments
+    var platformSeeder = startupScope.ServiceProvider.GetRequiredService<PlatformConfigurationSeeder>();
+    await platformSeeder.SeedAsync();
+
     // Permissions are application metadata — seed in all environments
     var permissionSeeder = startupScope.ServiceProvider.GetRequiredService<PermissionRegistrySeeder>();
     await permissionSeeder.SeedAsync();
@@ -86,6 +90,7 @@ app.UseAuthorization();
     }
 }
 
+app.MapSetupEndpoints();
 app.MapAuthEndpoints();
 app.MapPlatformEndpoints();
 app.MapDeviceEndpoints();

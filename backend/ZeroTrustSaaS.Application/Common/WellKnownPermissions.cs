@@ -32,22 +32,37 @@ public static class WellKnownPermissions
             [SecurityManage] = "Manage security policies",
         };
 
-    public static readonly IReadOnlyList<string> OwnerPermissions = new[]
-    {
+    // Tenant role permission sets
+    public static readonly IReadOnlyList<string> OwnerPermissions =
+    [
         TenantView, TenantManage, UserView, UserCreate, UserManage,
         RoleView, RoleManage, DeviceView, DeviceManage,
-        AuditView, MfaManage, SecurityManage
-    };
+        AuditView, MfaManage, SecurityManage,
+    ];
 
-    public static readonly IReadOnlyList<string> AdministratorPermissions = new[]
-    {
+    public static readonly IReadOnlyList<string> AdministratorPermissions =
+    [
         TenantView, UserView, UserCreate, UserManage,
         RoleView, RoleManage, DeviceView, DeviceManage,
-        AuditView, MfaManage
-    };
+        AuditView, MfaManage,
+    ];
 
-    public static readonly IReadOnlyList<string> MemberPermissions = new[]
-    {
-        UserView, DeviceView, AuditView
-    };
+    public static readonly IReadOnlyList<string> ManagerPermissions =
+    [
+        TenantView, UserView, UserCreate, UserManage,
+        RoleView, DeviceView, AuditView,
+    ];
+
+    public static readonly IReadOnlyList<string> AuditorPermissions =
+    [
+        TenantView, UserView, DeviceView, AuditView,
+    ];
+
+    public static readonly IReadOnlyList<string> EmployeePermissions =
+    [
+        UserView, DeviceView,
+    ];
+
+    // Legacy alias kept for callers that used "Member"
+    public static readonly IReadOnlyList<string> MemberPermissions = EmployeePermissions;
 }

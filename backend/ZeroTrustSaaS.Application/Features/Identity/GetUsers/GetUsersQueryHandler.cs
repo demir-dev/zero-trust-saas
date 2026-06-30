@@ -5,33 +5,42 @@ using ZeroTrustSaaS.Domain.Common;
 
 namespace ZeroTrustSaaS.Application.Features.Identity.GetUsers;
 
-public sealed class GetUsersQueryHandler(IUserRepository userRepository)
+public sealed class GetUsersQueryHandler(
+    ITenantMembershipRepository membershipRepository,
+    IUserRepository userRepository)
 {
     public async Task<Result<PagedResult<UserDto>>> Handle(
         GetUsersQuery query,
         CancellationToken cancellationToken = default)
     {
-        var users = await userRepository.GetByTenantIdAsync(
+        var memberships = await membershipRepository.GetByTenantIdAsync(
             query.TenantId,
             query.Page,
             query.PageSize,
             cancellationToken);
 
-        var total = await userRepository.CountByTenantAsync(query.TenantId, cancellationToken);
+        var total = await membershipRepository.CountByTenantAsync(query.TenantId, cancellationToken);
 
-        var items = users
-            .Select(u => new UserDto(
-                u.Id,
-                u.TenantId,
-                u.Email.Value,
-                u.Status.ToString(),
-                u.IsEmailConfirmed,
-                u.IsMfaEnabled,
-                u.MfaMethod.ToString(),
-                u.RegisteredAtUtc,
-                u.LastLoginUtc,
-                u.LockedUntilUtc))
-            .ToList();
+        var items = new List<UserDto>(memberships.Count);
+
+        foreach (var membership in memberships)
+        {
+            var user = await userRepository.GetByIdAsync(membership.UserId, cancellationToken);
+            if (user is null)
+                continue;
+
+            items.Add(new UserDto(
+                user.Id,
+                user.Email.Value,
+                user.DisplayName,
+                user.Status.ToString(),
+                user.IsEmailConfirmed,
+                user.IsMfaEnabled,
+                user.MfaMethod.ToString(),
+                user.RegisteredAtUtc,
+                user.LastLoginUtc,
+                user.LockedUntilUtc));
+        }
 
         return Result<PagedResult<UserDto>>.Success(
             new PagedResult<UserDto>(items, total, query.Page, query.PageSize));

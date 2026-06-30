@@ -13,17 +13,34 @@ internal sealed class JwtTokenGenerator(IOptions<JwtSettings> jwtSettings) : ITo
 {
     private readonly JwtSettings _settings = jwtSettings.Value;
 
-    public string GenerateJwtToken(Guid userId, Guid tenantId, IEnumerable<string> roles)
+    public string GenerateJwtToken(
+        Guid userId,
+        string email,
+        string securityStamp,
+        IEnumerable<string> platformRoles,
+        Guid? tenantId,
+        string? tenantRole,
+        IEnumerable<string> permissions)
     {
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new(JwtRegisteredClaimNames.Email, email),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new("tenant_id", tenantId.ToString()),
+            new("security_stamp", securityStamp),
         };
 
-        foreach (var role in roles)
-            claims.Add(new Claim(ClaimTypes.Role, role));
+        foreach (var role in platformRoles)
+            claims.Add(new Claim("platform_role", role));
+
+        if (tenantId.HasValue)
+            claims.Add(new Claim("tenant_id", tenantId.Value.ToString()));
+
+        if (!string.IsNullOrEmpty(tenantRole))
+            claims.Add(new Claim("tenant_role", tenantRole));
+
+        foreach (var permission in permissions)
+            claims.Add(new Claim("permission", permission));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.SecretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

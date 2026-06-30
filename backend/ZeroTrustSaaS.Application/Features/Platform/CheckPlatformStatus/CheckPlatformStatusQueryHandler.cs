@@ -3,13 +3,13 @@ using ZeroTrustSaaS.Domain.Common;
 
 namespace ZeroTrustSaaS.Application.Features.Platform.CheckPlatformStatus;
 
-public sealed class CheckPlatformStatusQueryHandler(ITenantRepository tenantRepository)
+public sealed class CheckPlatformStatusQueryHandler(IPlatformConfigurationRepository platformConfigRepository)
 {
     public async Task<Result<bool>> Handle(
         CheckPlatformStatusQuery query,
         CancellationToken cancellationToken = default)
     {
-        var count = await tenantRepository.CountAsync(cancellationToken);
-        return Result<bool>.Success(count > 0);
+        var config = await platformConfigRepository.GetAsync(cancellationToken);
+        return Result<bool>.Success(config?.IsInitialized ?? false);
     }
 }

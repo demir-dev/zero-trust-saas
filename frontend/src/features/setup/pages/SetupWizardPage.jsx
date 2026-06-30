@@ -1,14 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Box, Card, CardContent, Typography, Stepper, Step, StepLabel,
-  TextField, Button, InputAdornment, IconButton, LinearProgress,
-  Alert, Divider, Chip
+  TextField, Button, InputAdornment, IconButton, LinearProgress, Alert
 } from '@mui/material'
 import {
   Shield as ShieldIcon,
   Visibility, VisibilityOff,
-  Business as BusinessIcon,
   Person as PersonIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
@@ -22,17 +20,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../../../shared/api/axiosInstance'
 import ProblemAlert from '../../../shared/components/ProblemAlert'
 
-const STEPS = ['Organization', 'Administrator', 'Review', 'Provisioning']
-
-const orgSchema = z.object({
-  organizationName: z.string().min(2, 'At least 2 characters').max(100, 'Max 100 characters'),
-  organizationSlug: z
-    .string()
-    .regex(
-      /^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/,
-      '3–50 chars, lowercase letters, numbers, hyphens only, cannot start/end with hyphen'
-    ),
-})
+const STEPS = ['Administrator', 'Review', 'Provisioning']
 
 const adminSchema = z
   .object({
@@ -52,85 +40,14 @@ const adminSchema = z
     path: ['confirmPassword'],
   })
 
-function slugify(name) {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 50)
-}
-
 const slideVariants = {
   enter: (dir) => ({ x: dir > 0 ? 40 : -40, opacity: 0 }),
   center: { x: 0, opacity: 1 },
   exit: (dir) => ({ x: dir > 0 ? -40 : 40, opacity: 0 }),
 }
 
-// ─── Step 1: Organization ───────────────────────────────────────────────────
-function OrgStep({ data, onNext }) {
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm({
-    resolver: zodResolver(orgSchema),
-    defaultValues: data,
-  })
-
-  const nameValue = watch('organizationName', '')
-  const slugRef = useRef(false)
-
-  useEffect(() => {
-    if (!slugRef.current && nameValue) {
-      setValue('organizationSlug', slugify(nameValue), { shouldValidate: false })
-    }
-  }, [nameValue, setValue])
-
-  return (
-    <Box component="form" onSubmit={handleSubmit(onNext)} sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-      <Box>
-        <Typography variant="h6" fontWeight={600}>Set up your organization</Typography>
-        <Typography variant="body2" color="text.secondary" mt={0.5}>
-          This is how your team will identify your workspace.
-        </Typography>
-      </Box>
-
-      <TextField
-        label="Organization Name"
-        placeholder="Acme Corporation"
-        {...register('organizationName')}
-        error={!!errors.organizationName}
-        helperText={errors.organizationName?.message}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <BusinessIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
-            </InputAdornment>
-          ),
-        }}
-      />
-
-      <TextField
-        label="Organization Slug"
-        placeholder="acme-corp"
-        {...register('organizationSlug', {
-          onChange: () => { slugRef.current = true },
-        })}
-        error={!!errors.organizationSlug}
-        helperText={errors.organizationSlug?.message ?? 'Used to identify your organization (e.g. acme-corp.zerotrust.com)'}
-      />
-
-      <Button type="submit" variant="contained" size="large" endIcon={<ArrowForward />} sx={{ mt: 1 }}>
-        Continue
-      </Button>
-    </Box>
-  )
-}
-
-// ─── Step 2: Administrator ───────────────────────────────────────────────────
-function AdminStep({ data, onNext, onBack }) {
+// ─── Step 1: Administrator ───────────────────────────────────────────────────
+function AdminStep({ data, onNext }) {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const {
@@ -142,9 +59,9 @@ function AdminStep({ data, onNext, onBack }) {
   return (
     <Box component="form" onSubmit={handleSubmit(onNext)} sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
       <Box>
-        <Typography variant="h6" fontWeight={600}>Create the administrator account</Typography>
+        <Typography variant="h6" fontWeight={600}>Create the platform owner account</Typography>
         <Typography variant="body2" color="text.secondary" mt={0.5}>
-          This account will have full Owner access to your organization.
+          This account will have full administrative control over the platform.
         </Typography>
       </Box>
 
@@ -212,19 +129,14 @@ function AdminStep({ data, onNext, onBack }) {
         }}
       />
 
-      <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
-        <Button variant="outlined" startIcon={<ArrowBack />} onClick={onBack} sx={{ flex: 1 }}>
-          Back
-        </Button>
-        <Button type="submit" variant="contained" size="large" endIcon={<ArrowForward />} sx={{ flex: 2 }}>
-          Continue
-        </Button>
-      </Box>
+      <Button type="submit" variant="contained" size="large" endIcon={<ArrowForward />} sx={{ mt: 1 }}>
+        Continue
+      </Button>
     </Box>
   )
 }
 
-// ─── Step 3: Review ──────────────────────────────────────────────────────────
+// ─── Step 2: Review ──────────────────────────────────────────────────────────
 function ReviewStep({ formData, onNext, onBack }) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
@@ -238,35 +150,22 @@ function ReviewStep({ formData, onNext, onBack }) {
       <Card variant="outlined" sx={{ bgcolor: 'background.default' }}>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-            <Typography variant="overline" color="text.secondary">Organization</Typography>
+            <Typography variant="overline" color="text.secondary">Platform Owner</Typography>
             <Button size="small" onClick={() => onBack(0)}>Edit</Button>
-          </Box>
-          <Typography variant="body1" fontWeight={600}>{formData.organizationName}</Typography>
-          <Chip
-            label={formData.organizationSlug}
-            size="small"
-            icon={<BusinessIcon />}
-            sx={{ mt: 0.5, fontSize: '0.75rem' }}
-          />
-        </CardContent>
-      </Card>
-
-      <Card variant="outlined" sx={{ bgcolor: 'background.default' }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-            <Typography variant="overline" color="text.secondary">Administrator</Typography>
-            <Button size="small" onClick={() => onBack(1)}>Edit</Button>
           </Box>
           <Typography variant="body1" fontWeight={600}>
             {formData.firstName} {formData.lastName}
           </Typography>
           <Typography variant="body2" color="text.secondary">{formData.email}</Typography>
-          <Chip label="Owner" size="small" color="primary" sx={{ mt: 0.5 }} />
         </CardContent>
       </Card>
 
+      <Alert severity="info" sx={{ fontSize: '0.8rem' }}>
+        You will be able to create tenants and manage the platform after signing in.
+      </Alert>
+
       <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
-        <Button variant="outlined" startIcon={<ArrowBack />} onClick={() => onBack(1)} sx={{ flex: 1 }}>
+        <Button variant="outlined" startIcon={<ArrowBack />} onClick={() => onBack(0)} sx={{ flex: 1 }}>
           Back
         </Button>
         <Button
@@ -283,13 +182,12 @@ function ReviewStep({ formData, onNext, onBack }) {
   )
 }
 
-// ─── Step 4: Provisioning ────────────────────────────────────────────────────
+// ─── Step 3: Provisioning ────────────────────────────────────────────────────
 const STATUS_MESSAGES = [
-  'Creating organization…',
-  'Seeding permission registry…',
-  'Provisioning roles…',
+  'Initializing platform…',
+  'Creating platform owner…',
   'Configuring security defaults…',
-  'Activating tenant…',
+  'Finalizing setup…',
 ]
 
 function ProvisioningStep({ formData, onGoBack }) {
@@ -299,16 +197,13 @@ function ProvisioningStep({ formData, onGoBack }) {
 
   const { mutate, isPending, isSuccess, isError, error } = useMutation({
     mutationFn: (data) =>
-      api.post('/platform/initialize', {
-        organizationName: data.organizationName,
-        organizationSlug: data.organizationSlug,
-        adminFirstName: data.firstName,
-        adminLastName: data.lastName,
-        adminEmail: data.email,
-        adminPassword: data.password,
+      api.post('/setup', {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        password: data.password,
       }),
     onSuccess: () => {
-      // Invalidate platform status so PlatformStatusProvider re-fetches
       queryClient.invalidateQueries({ queryKey: ['platform', 'status'] })
       setTimeout(() => {
         navigate('/login', {
@@ -410,8 +305,6 @@ export default function SetupWizardPage() {
   const [step, setStep] = useState(0)
   const [direction, setDirection] = useState(1)
   const [formData, setFormData] = useState({
-    organizationName: '',
-    organizationSlug: '',
     firstName: '',
     lastName: '',
     email: '',
@@ -424,17 +317,12 @@ export default function SetupWizardPage() {
     setStep(nextStep)
   }
 
-  const handleOrgNext = (data) => {
+  const handleAdminNext = (data) => {
     setFormData((d) => ({ ...d, ...data }))
     goTo(1)
   }
 
-  const handleAdminNext = (data) => {
-    setFormData((d) => ({ ...d, ...data }))
-    goTo(2)
-  }
-
-  const handleReviewNext = () => goTo(3)
+  const handleReviewNext = () => goTo(2)
 
   const handleGoBack = (targetStep) => goTo(targetStep ?? step - 1)
 
@@ -451,7 +339,6 @@ export default function SetupWizardPage() {
       }}
     >
       <Box sx={{ width: '100%', maxWidth: 520 }}>
-        {/* Header */}
         <Box sx={{ textAlign: 'center', mb: 3 }}>
           <Box sx={{ display: 'inline-flex', p: 1.5, borderRadius: 3, bgcolor: 'rgba(99,102,241,0.12)', mb: 2 }}>
             <ShieldIcon sx={{ color: 'primary.main', fontSize: 36 }} />
@@ -462,7 +349,6 @@ export default function SetupWizardPage() {
           </Typography>
         </Box>
 
-        {/* Stepper */}
         <Stepper activeStep={step} sx={{ mb: 3 }}>
           {STEPS.map((label) => (
             <Step key={label}>
@@ -471,7 +357,6 @@ export default function SetupWizardPage() {
           ))}
         </Stepper>
 
-        {/* Card */}
         <Card>
           <CardContent sx={{ p: 3 }}>
             <AnimatePresence mode="wait" custom={direction}>
@@ -485,22 +370,19 @@ export default function SetupWizardPage() {
                 transition={{ duration: 0.25, ease: 'easeInOut' }}
               >
                 {step === 0 && (
-                  <OrgStep data={formData} onNext={handleOrgNext} />
+                  <AdminStep data={formData} onNext={handleAdminNext} />
                 )}
                 {step === 1 && (
-                  <AdminStep data={formData} onNext={handleAdminNext} onBack={() => handleGoBack(0)} />
-                )}
-                {step === 2 && (
                   <ReviewStep
                     formData={formData}
                     onNext={handleReviewNext}
                     onBack={(s) => handleGoBack(s)}
                   />
                 )}
-                {step === 3 && (
+                {step === 2 && (
                   <ProvisioningStep
                     formData={formData}
-                    onGoBack={() => handleGoBack(2)}
+                    onGoBack={() => handleGoBack(1)}
                   />
                 )}
               </motion.div>

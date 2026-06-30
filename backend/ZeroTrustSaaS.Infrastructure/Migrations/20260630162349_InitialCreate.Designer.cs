@@ -12,7 +12,7 @@ using ZeroTrustSaaS.Infrastructure.Persistence;
 namespace ZeroTrustSaaS.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260630100004_InitialCreate")]
+    [Migration("20260630162349_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -246,6 +246,9 @@ namespace ZeroTrustSaaS.Infrastructure.Migrations
                     b.Property<DateTime?>("RevokedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("UsedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -275,6 +278,11 @@ namespace ZeroTrustSaaS.Infrastructure.Migrations
                     b.Property<DateTime?>("EmailVerifiedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("FirstName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("first_name");
+
                     b.Property<bool>("IsEmailConfirmed")
                         .HasColumnType("boolean");
 
@@ -286,6 +294,11 @@ namespace ZeroTrustSaaS.Infrastructure.Migrations
 
                     b.Property<DateTime?>("LastLoginUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("last_name");
 
                     b.Property<DateTime?>("LockedUntilUtc")
                         .HasColumnType("timestamp with time zone");
@@ -302,9 +315,6 @@ namespace ZeroTrustSaaS.Infrastructure.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -319,17 +329,46 @@ namespace ZeroTrustSaaS.Infrastructure.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("ZeroTrustSaaS.Domain.Platform.PlatformConfiguration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("InitializedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsInitialized")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("platform_configuration", (string)null);
+                });
+
             modelBuilder.Entity("ZeroTrustSaaS.Domain.Tenants.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("ActivatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("Plan")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("SuspendedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
@@ -342,14 +381,29 @@ namespace ZeroTrustSaaS.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("AcceptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("InvitedByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("IsOwner")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime>("JoinedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
@@ -810,6 +864,10 @@ namespace ZeroTrustSaaS.Infrastructure.Migrations
                                 .HasColumnName("email");
 
                             b1.HasKey("UserId");
+
+                            b1.HasIndex("Value")
+                                .IsUnique()
+                                .HasDatabaseName("ix_users_email");
 
                             b1.ToTable("users");
 

@@ -31,12 +31,12 @@ public static class TenantErrors
     public static readonly Error AlreadySuspended =
         Error.Conflict("Tenants.Tenant.AlreadySuspended", "Tenant is already suspended.");
 
-    public static readonly Error AlreadyDisabled =
-        Error.Conflict("Tenants.Tenant.AlreadyDisabled", "Tenant is already disabled.");
+    public static readonly Error AlreadyDeleted =
+        Error.Conflict("Tenants.Tenant.AlreadyDeleted", "Tenant is already deleted.");
 
-    public static readonly Error CannotReactivateDisabled =
-        Error.Conflict("Tenants.Tenant.CannotReactivateDisabled",
-            "A disabled tenant cannot be reactivated directly. Use Restore instead.");
+    public static readonly Error CannotReactivateDeleted =
+        Error.Conflict("Tenants.Tenant.CannotReactivateDeleted",
+            "A deleted tenant cannot be reactivated.");
 
     public static readonly Error MembershipAlreadyExists =
         Error.Conflict("Tenants.Tenant.MembershipAlreadyExists",
