@@ -25,6 +25,11 @@ public sealed class DeviceFingerprint : ValueObject
             new DeviceFingerprint(value.Trim()));
     }
 
+    public static DeviceFingerprint From(string value)
+    {
+        return new(value);
+    }
+
     protected override IEnumerable<object?> GetEqualityComponents()
     {
         yield return Value;
