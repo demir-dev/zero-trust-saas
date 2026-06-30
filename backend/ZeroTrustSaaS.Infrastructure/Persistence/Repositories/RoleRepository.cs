@@ -68,6 +68,11 @@ internal sealed class RoleRepository(AppDbContext dbContext) : IRoleRepository
         dbContext.Roles.Update(role);
     }
 
+    public void Remove(Role role)
+    {
+        dbContext.Roles.Remove(role);
+    }
+
     public void UpdateUserRole(UserRole userRole)
     {
         dbContext.UserRoles.Update(userRole);

@@ -25,5 +25,7 @@ public interface IRoleRepository
 
     void Update(Role role);
 
+    void Remove(Role role);
+
     void UpdateUserRole(UserRole userRole);
 }
