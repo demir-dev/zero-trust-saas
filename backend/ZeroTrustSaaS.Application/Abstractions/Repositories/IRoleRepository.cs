@@ -10,6 +10,8 @@ public interface IRoleRepository
         Guid tenantId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Role>> GetAllGlobalAsync(CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<UserRole>> GetUserRolesAsync(
         Guid userId,
         Guid? tenantId,

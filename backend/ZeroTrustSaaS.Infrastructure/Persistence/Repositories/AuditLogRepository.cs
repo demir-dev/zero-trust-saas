@@ -38,4 +38,41 @@ internal sealed class AuditLogRepository(AppDbContext dbContext) : IAuditLogRepo
             .Take(pageSize)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<AuditLog>> GetRecentAsync(
+        int count,
+        Guid? tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        var query = dbContext.AuditLogs.AsQueryable();
+
+        if (tenantId.HasValue)
+            query = query.Where(al => al.TenantId == tenantId.Value);
+
+        return await query
+            .OrderByDescending(al => al.OccurredAtUtc)
+            .Take(count)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<int> CountAsync(Guid? tenantId, CancellationToken cancellationToken = default)
+    {
+        if (tenantId.HasValue)
+            return dbContext.AuditLogs.CountAsync(al => al.TenantId == tenantId.Value, cancellationToken);
+
+        return dbContext.AuditLogs.CountAsync(cancellationToken);
+    }
+
+    public Task<int> CountByEventTypeAsync(
+        SecurityEventType eventType,
+        Guid? tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        if (tenantId.HasValue)
+            return dbContext.AuditLogs.CountAsync(
+                al => al.EventType == eventType && al.TenantId == tenantId.Value,
+                cancellationToken);
+
+        return dbContext.AuditLogs.CountAsync(al => al.EventType == eventType, cancellationToken);
+    }
 }

@@ -10,6 +10,18 @@ public interface IUserRepository
 
     Task<bool> ExistsByEmailAsync(string email, Guid tenantId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<User>> GetByTenantIdAsync(
+        Guid tenantId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
+    Task<int> CountByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default);
+
+    Task<int> CountMfaEnabledAsync(Guid tenantId, CancellationToken cancellationToken = default);
+
+    Task<int> CountTotalAsync(CancellationToken cancellationToken = default);
+
     Task AddAsync(User user, CancellationToken cancellationToken = default);
 
     void Update(User user);

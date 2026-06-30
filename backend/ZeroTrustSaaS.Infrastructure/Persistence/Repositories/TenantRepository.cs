@@ -24,6 +24,23 @@ internal sealed class TenantRepository(AppDbContext dbContext) : ITenantReposito
             .AnyAsync(t => t.Slug.Value == slug, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Tenant>> GetAllAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Tenants
+            .OrderBy(t => t.CreatedAtUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<int> CountAsync(CancellationToken cancellationToken = default)
+    {
+        return dbContext.Tenants.CountAsync(cancellationToken);
+    }
+
     public Task AddAsync(Tenant tenant, CancellationToken cancellationToken = default)
     {
         return dbContext.Tenants.AddAsync(tenant, cancellationToken).AsTask();

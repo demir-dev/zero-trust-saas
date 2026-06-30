@@ -34,6 +34,41 @@ internal sealed class UserRepository(AppDbContext dbContext) : IUserRepository
                 cancellationToken);
     }
 
+    public async Task<IReadOnlyList<User>> GetByTenantIdAsync(
+        Guid tenantId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Users
+            .Where(u => u.TenantId == tenantId)
+            .OrderBy(u => u.RegisteredAtUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<int> CountByTenantAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.Users
+            .CountAsync(u => u.TenantId == tenantId, cancellationToken);
+    }
+
+    public Task<int> CountMfaEnabledAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.Users
+            .CountAsync(u => u.TenantId == tenantId && u.IsMfaEnabled, cancellationToken);
+    }
+
+    public Task<int> CountTotalAsync(CancellationToken cancellationToken = default)
+    {
+        return dbContext.Users.CountAsync(cancellationToken);
+    }
+
     public Task AddAsync(User user, CancellationToken cancellationToken = default)
     {
         return dbContext.Users.AddAsync(user, cancellationToken).AsTask();

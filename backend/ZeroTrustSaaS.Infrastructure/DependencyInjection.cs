@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<ITrustedDeviceRepository, TrustedDeviceRepository>();
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+        services.AddScoped<IPermissionRepository, PermissionRepository>();
 
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddSingleton<ITokenGenerator, JwtTokenGenerator>();

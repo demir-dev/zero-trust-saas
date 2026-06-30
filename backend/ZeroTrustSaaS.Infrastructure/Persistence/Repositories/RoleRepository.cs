@@ -21,6 +21,14 @@ internal sealed class RoleRepository(AppDbContext dbContext) : IRoleRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Role>> GetAllGlobalAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Roles
+            .Where(r => r.TenantId == null)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<UserRole>> GetUserRolesAsync(
         Guid userId,
         Guid? tenantId,

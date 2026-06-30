@@ -32,6 +32,18 @@ internal sealed class TrustedDeviceRepository(AppDbContext dbContext) : ITrusted
             .ToListAsync(cancellationToken);
     }
 
+    public Task<int> CountByStatusAsync(
+        DeviceStatus status,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.TrustedDevices.CountAsync(td => td.Status == status, cancellationToken);
+    }
+
+    public Task<int> CountTotalAsync(CancellationToken cancellationToken = default)
+    {
+        return dbContext.TrustedDevices.CountAsync(cancellationToken);
+    }
+
     public Task AddAsync(TrustedDevice device, CancellationToken cancellationToken = default)
     {
         return dbContext.TrustedDevices.AddAsync(device, cancellationToken).AsTask();

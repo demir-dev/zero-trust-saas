@@ -15,6 +15,12 @@ public interface ITrustedDeviceRepository
         Guid userId,
         CancellationToken cancellationToken = default);
 
+    Task<int> CountByStatusAsync(
+        DeviceStatus status,
+        CancellationToken cancellationToken = default);
+
+    Task<int> CountTotalAsync(CancellationToken cancellationToken = default);
+
     Task AddAsync(TrustedDevice device, CancellationToken cancellationToken = default);
 
     void Update(TrustedDevice device);
