@@ -1,0 +1,26 @@
+namespace ZeroTrustSaaS.Domain.Audit;
+
+public enum SecurityEventType
+{
+    LoginSucceeded = 1,
+    LoginFailed = 2,
+    MfaEnabled = 3,
+    MfaDisabled = 4,
+    RefreshTokenRotated = 5,
+    RefreshTokenRevoked = 6,
+    TrustedDeviceAdded = 7,
+    TrustedDeviceRevoked = 8,
+    TrustedDeviceBlocked = 9,
+    PasswordChanged = 10,
+    EmailChanged = 11,
+    UserLocked = 12,
+    UserUnlocked = 13,
+    UserDisabled = 14,
+    UserSuspended = 15,
+    SuspiciousLoginDetected = 16,
+    TenantSuspended = 17,
+    TenantDisabled = 18,
+    RoleAssigned = 19,
+    RoleRevoked = 20,
+    PermissionAssigned = 21,
+}

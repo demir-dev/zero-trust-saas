@@ -1,6 +1,9 @@
 namespace ZeroTrustSaaS.Domain.Audit;
 
-public class AuditSeverity
+public enum AuditSeverity
 {
-    
+    Info = 1,
+    Warning = 2,
+    High = 3,
+    Critical = 4,
 }
