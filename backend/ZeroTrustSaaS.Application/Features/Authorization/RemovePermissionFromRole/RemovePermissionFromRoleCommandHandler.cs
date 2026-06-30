@@ -1,6 +1,7 @@
 using ZeroTrustSaaS.Application.Abstractions.Persistence;
 using ZeroTrustSaaS.Application.Abstractions.Repositories;
 using ZeroTrustSaaS.Application.Abstractions.Services;
+using ZeroTrustSaaS.Application.Common;
 using ZeroTrustSaaS.Domain.Audit;
 using ZeroTrustSaaS.Domain.Authorization;
 using ZeroTrustSaaS.Domain.Authorization.Errors;
@@ -11,6 +12,7 @@ namespace ZeroTrustSaaS.Application.Features.Authorization.RemovePermissionFromR
 public sealed class RemovePermissionFromRoleCommandHandler(
     IRoleRepository roleRepository,
     IAuditLogRepository auditLogRepository,
+    ICurrentUserContext currentUser,
     IDateTimeProvider dateTimeProvider,
     IUnitOfWork unitOfWork)
 {
@@ -18,6 +20,8 @@ public sealed class RemovePermissionFromRoleCommandHandler(
         RemovePermissionFromRoleCommand command,
         CancellationToken cancellationToken = default)
     {
+        var permCheck = currentUser.RequirePermission(WellKnownPermissions.RoleManage);
+        if (permCheck.IsFailure) return permCheck;
         var role = await roleRepository.GetByIdAsync(command.RoleId, cancellationToken);
 
         if (role is null)

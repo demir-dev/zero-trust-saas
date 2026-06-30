@@ -1,6 +1,7 @@
 using ZeroTrustSaaS.Application.Abstractions.Persistence;
 using ZeroTrustSaaS.Application.Abstractions.Repositories;
 using ZeroTrustSaaS.Application.Abstractions.Services;
+using ZeroTrustSaaS.Application.Common;
 using ZeroTrustSaaS.Domain.Audit;
 using ZeroTrustSaaS.Domain.Authorization.Errors;
 using ZeroTrustSaaS.Domain.Common;
@@ -10,6 +11,7 @@ namespace ZeroTrustSaaS.Application.Features.Authorization.DeleteRole;
 public sealed class DeleteRoleCommandHandler(
     IRoleRepository roleRepository,
     IAuditLogRepository auditLogRepository,
+    ICurrentUserContext currentUser,
     IDateTimeProvider dateTimeProvider,
     IUnitOfWork unitOfWork)
 {
@@ -17,6 +19,8 @@ public sealed class DeleteRoleCommandHandler(
         DeleteRoleCommand command,
         CancellationToken cancellationToken = default)
     {
+        var permCheck = currentUser.RequirePermission(WellKnownPermissions.RoleManage);
+        if (permCheck.IsFailure) return permCheck;
         var role = await roleRepository.GetByIdAsync(command.RoleId, cancellationToken);
 
         if (role is null)

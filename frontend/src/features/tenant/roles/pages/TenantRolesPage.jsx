@@ -42,7 +42,8 @@ function usePermissions() {
 }
 
 export default function TenantRolesPage() {
-  const { tenantId } = useAuth()
+  const { tenantId, hasPermission } = useAuth()
+  const canManageRoles = hasPermission('role.manage')
   const [selected, setSelected] = useState(null)
   const queryClient = useQueryClient()
 
@@ -153,11 +154,11 @@ export default function TenantRolesPage() {
       <PageHeader
         title="Roles & Permissions"
         subtitle="Manage access control for your organization"
-        action={
+        action={canManageRoles && (
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateRoleOpen(true)}>
             New Role
           </Button>
-        }
+        )}
       />
 
       <Grid container spacing={3}>
@@ -197,7 +198,7 @@ export default function TenantRolesPage() {
                               <LockIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
                             </Tooltip>
                           )}
-                          {!role.isSystem && selected === role.id && (
+                          {!role.isSystem && canManageRoles && selected === role.id && (
                             <>
                               <Tooltip title="Rename">
                                 <IconButton
@@ -256,7 +257,7 @@ export default function TenantRolesPage() {
                         {selectedRole.scope} scope · {selectedRole.permissions?.length ?? 0} permissions
                       </Typography>
                     </Box>
-                    {!selectedRole.isSystem && (
+                    {!selectedRole.isSystem && canManageRoles && (
                       <Button size="small" variant="outlined" startIcon={<AddIcon />} onClick={openAddPerm}>
                         Add Permissions
                       </Button>
@@ -281,7 +282,7 @@ export default function TenantRolesPage() {
                             variant="outlined"
                             color="secondary"
                             sx={{ fontFamily: 'monospace' }}
-                            {...(!selectedRole.isSystem && {
+                            {...(!selectedRole.isSystem && canManageRoles && {
                               onDelete: () => setRemovePerm(code),
                               deleteIcon: (
                                 <Tooltip title="Remove permission">

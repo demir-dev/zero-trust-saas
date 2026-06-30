@@ -338,7 +338,9 @@ function UserDetailDrawer({ userId, tenantId, onClose }) {
 }
 
 export default function TenantUsersPage() {
-  const { tenantId } = useAuth()
+  const { tenantId, hasPermission } = useAuth()
+  const canCreateUsers = hasPermission('user.create')
+  const canManageUsers = hasPermission('user.manage')
   const queryClient = useQueryClient()
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 20 })
   const [selectedUserId, setSelectedUserId] = useState(null)
@@ -389,10 +391,10 @@ export default function TenantUsersPage() {
         ? new Date(value).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
         : '—',
     },
-    {
+    ...(canManageUsers ? [{
       field: 'actions', headerName: '', width: 60, sortable: false,
       renderCell: ({ row }) => <UserActionsMenu userId={row.id} />,
-    },
+    }] : []),
   ]
 
   return (
@@ -400,11 +402,11 @@ export default function TenantUsersPage() {
       <PageHeader
         title="Users"
         subtitle="Manage user accounts within your organization"
-        action={
+        action={canCreateUsers && (
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => { reset(); setCreateError(null); setCreateOpen(true) }}>
             New User
           </Button>
-        }
+        )}
       />
 
       <Card>

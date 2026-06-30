@@ -1,6 +1,7 @@
 using ZeroTrustSaaS.Application.Abstractions.Persistence;
 using ZeroTrustSaaS.Application.Abstractions.Repositories;
 using ZeroTrustSaaS.Application.Abstractions.Services;
+using ZeroTrustSaaS.Application.Common;
 using ZeroTrustSaaS.Domain.Authorization;
 using ZeroTrustSaaS.Domain.Authorization.Errors;
 using ZeroTrustSaaS.Domain.Common;
@@ -9,6 +10,7 @@ namespace ZeroTrustSaaS.Application.Features.Authorization.AssignPermissionToRol
 
 public sealed class AssignPermissionToRoleCommandHandler(
     IRoleRepository roleRepository,
+    ICurrentUserContext currentUser,
     IDateTimeProvider dateTimeProvider,
     IUnitOfWork unitOfWork)
 {
@@ -16,6 +18,8 @@ public sealed class AssignPermissionToRoleCommandHandler(
         AssignPermissionToRoleCommand command,
         CancellationToken cancellationToken = default)
     {
+        var permCheck = currentUser.RequirePermission(WellKnownPermissions.RoleManage);
+        if (permCheck.IsFailure) return permCheck;
         var role = await roleRepository.GetByIdAsync(command.RoleId, cancellationToken);
 
         if (role is null)
