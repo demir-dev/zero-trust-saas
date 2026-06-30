@@ -76,25 +76,25 @@ internal sealed class UserRepository(AppDbContext dbContext) : IUserRepository
 
     public void Update(User user)
     {
-        // context.Update(user) recursively marks every entity in the graph as Modified,
-        // including new LoginAttempts and RefreshTokens that have Guid keys but were never
-        // inserted — causing SaveChanges to emit UPDATEs that affect 0 rows.
-        // Instead: mark only the User scalar properties as Modified, then explicitly
-        // promote Detached collection members (new, never-tracked) to Added.
+        // Capture new (Detached) collection members BEFORE attaching the User.
+        // Setting Entry(user).State = Modified triggers EF relationship fixup, which
+        // auto-tracks any navigation items it finds — changing their state from Detached
+        // to Modified. A newly created LoginAttempt/RefreshToken with a Guid PK would then
+        // be marked Modified (not Detached), so the post-attach check would miss them and
+        // EF would emit UPDATEs against rows that don't exist yet → DbUpdateConcurrencyException.
+        var newAttempts = user.LoginAttempts
+            .Where(a => dbContext.Entry(a).State == EntityState.Detached)
+            .ToList();
+        var newTokens = user.RefreshTokens
+            .Where(t => dbContext.Entry(t).State == EntityState.Detached)
+            .ToList();
+
         dbContext.Entry(user).State = EntityState.Modified;
 
-        foreach (var attempt in user.LoginAttempts)
-        {
-            var entry = dbContext.Entry(attempt);
-            if (entry.State == EntityState.Detached)
-                entry.State = EntityState.Added;
-        }
+        foreach (var attempt in newAttempts)
+            dbContext.Entry(attempt).State = EntityState.Added;
 
-        foreach (var token in user.RefreshTokens)
-        {
-            var entry = dbContext.Entry(token);
-            if (entry.State == EntityState.Detached)
-                entry.State = EntityState.Added;
-        }
+        foreach (var token in newTokens)
+            dbContext.Entry(token).State = EntityState.Added;
     }
 }
