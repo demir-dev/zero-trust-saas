@@ -1,4 +1,4 @@
-using ZeroTrustSaaS.Domain.Identity;
+using ZeroTrustSaaS.Domain.Security;
 
 namespace ZeroTrustSaaS.Domain.Common;
 

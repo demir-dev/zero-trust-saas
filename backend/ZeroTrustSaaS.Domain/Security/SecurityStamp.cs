@@ -1,6 +1,6 @@
 using ZeroTrustSaaS.Domain.Common;
 
-namespace ZeroTrustSaaS.Domain.Identity;
+namespace ZeroTrustSaaS.Domain.Security;
 
 public sealed class SecurityStamp : ValueObject
 {
