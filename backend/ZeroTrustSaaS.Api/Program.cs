@@ -63,17 +63,19 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Runs in ALL environments — permissions are application metadata, not tenant data
 {
     using var startupScope = app.Services.CreateScope();
 
+    // Migrations must run before any seeder — applies in all environments
+    var db = startupScope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+
+    // Permissions are application metadata — seed in all environments
     var permissionSeeder = startupScope.ServiceProvider.GetRequiredService<PermissionRegistrySeeder>();
     await permissionSeeder.SeedAsync();
 
     if (app.Environment.IsDevelopment())
     {
-        var db = startupScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        db.Database.Migrate();
         var devSeeder = startupScope.ServiceProvider.GetRequiredService<DevelopmentDataSeeder>();
         await devSeeder.SeedAsync();
     }
