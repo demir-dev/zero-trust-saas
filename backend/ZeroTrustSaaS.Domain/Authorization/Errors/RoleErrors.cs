@@ -25,4 +25,8 @@ public static class RoleErrors
     public static readonly Error SystemRoleCannotBeModified =
         Error.Conflict("Authorization.Role.SystemRoleCannotBeModified",
             "System roles cannot be modified.");
+
+    public static readonly Error CannotDeleteSystemRole =
+        Error.Conflict("Authorization.Role.CannotDeleteSystemRole",
+            "System roles cannot be deleted.");
 }
