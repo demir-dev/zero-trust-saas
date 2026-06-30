@@ -74,7 +74,12 @@ app.UseAuthorization();
     var permissionSeeder = startupScope.ServiceProvider.GetRequiredService<PermissionRegistrySeeder>();
     await permissionSeeder.SeedAsync();
 
-    if (app.Environment.IsDevelopment())
+    // Set SEED_DEV_DATA=false to skip pre-seeding and test the Setup Wizard flow manually
+    var skipSeed = string.Equals(
+        app.Configuration["SEED_DEV_DATA"], "false",
+        StringComparison.OrdinalIgnoreCase);
+
+    if (app.Environment.IsDevelopment() && !skipSeed)
     {
         var devSeeder = startupScope.ServiceProvider.GetRequiredService<DevelopmentDataSeeder>();
         await devSeeder.SeedAsync();
