@@ -1,64 +1,115 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { usePlatformStatus } from '../providers'
-import ProtectedRoute from './ProtectedRoute'
-import AppLayout from '../layout/AppLayout'
+import { useAuth } from '../../features/auth/store/authStore'
+
+import RequireAuth from './guards/RequireAuth'
+import RequirePlatform from './guards/RequirePlatform'
+import RequireTenant from './guards/RequireTenant'
+import PlatformLayout from '../layouts/PlatformLayout'
+import TenantLayout from '../layouts/TenantLayout'
 
 import LoginPage from '../../features/auth/pages/LoginPage'
-import RegisterPage from '../../features/auth/pages/RegisterPage'
 import SetupWizardPage from '../../features/setup/pages/SetupWizardPage'
-import DashboardPage from '../../features/dashboard/pages/DashboardPage'
-import TenantsPage from '../../features/tenants/pages/TenantsPage'
-import UsersPage from '../../features/users/pages/UsersPage'
-import DevicesPage from '../../features/devices/pages/DevicesPage'
-import RolesPage from '../../features/authorization/pages/RolesPage'
-import AuditPage from '../../features/audit/pages/AuditPage'
-import MfaPage from '../../features/mfa/pages/MfaPage'
-import SettingsPage from '../../features/settings/pages/SettingsPage'
+
+import PlatformDashboardPage from '../../features/platform/dashboard/pages/PlatformDashboardPage'
+import TenantsManagementPage from '../../features/platform/tenants/pages/TenantsManagementPage'
+import PlatformUsersPage from '../../features/platform/users/pages/PlatformUsersPage'
+import GlobalAuditPage from '../../features/platform/audit/pages/GlobalAuditPage'
+import PlatformSettingsPage from '../../features/platform/settings/pages/PlatformSettingsPage'
+
+import TenantDashboardPage from '../../features/tenant/dashboard/pages/TenantDashboardPage'
+import TenantUsersPage from '../../features/tenant/users/pages/TenantUsersPage'
+import TenantRolesPage from '../../features/tenant/roles/pages/TenantRolesPage'
+import TenantDevicesPage from '../../features/tenant/devices/pages/TenantDevicesPage'
+import SecurityCenterPage from '../../features/tenant/security/pages/SecurityCenterPage'
+import TenantAuditPage from '../../features/tenant/audit/pages/TenantAuditPage'
+
+import ProfilePage from '../../features/profile/pages/ProfilePage'
+
+function RootRedirect() {
+  const { isAuthenticated, isPlatformUser, hasTenantContext } = useAuth()
+  const { isInitialized } = usePlatformStatus()
+
+  if (!isInitialized) return <Navigate to="/setup" replace />
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (isPlatformUser) return <Navigate to="/platform/dashboard" replace />
+  if (hasTenantContext) return <Navigate to="/tenant/dashboard" replace />
+  return <Navigate to="/login" replace />
+}
 
 export default function AppRouter() {
   const { isInitialized } = usePlatformStatus()
 
   return (
     <Routes>
-      {/* Setup Wizard — only accessible when NOT initialized */}
+      {/* Public — setup */}
       <Route
         path="/setup"
         element={isInitialized ? <Navigate to="/login" replace /> : <SetupWizardPage />}
       />
 
-      {/* Login — redirects to setup if not initialized */}
+      {/* Public — login */}
       <Route
         path="/login"
         element={!isInitialized ? <Navigate to="/setup" replace /> : <LoginPage />}
       />
 
-      {/* Register — public registration removed */}
-      <Route path="/register" element={<Navigate to="/login" replace />} />
-
-      {/* Protected app routes */}
+      {/* Platform administration */}
       <Route
-        path="/"
+        path="/platform"
         element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
+          <RequireAuth>
+            <RequirePlatform>
+              <PlatformLayout />
+            </RequirePlatform>
+          </RequireAuth>
         }
       >
-        <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="tenants" element={<TenantsPage />} />
-        <Route path="users" element={<UsersPage />} />
-        <Route path="devices" element={<DevicesPage />} />
-        <Route path="roles" element={<RolesPage />} />
-        <Route path="audit" element={<AuditPage />} />
-        <Route path="mfa" element={<MfaPage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route index element={<Navigate to="/platform/dashboard" replace />} />
+        <Route path="dashboard" element={<PlatformDashboardPage />} />
+        <Route path="tenants" element={<TenantsManagementPage />} />
+        <Route path="users" element={<PlatformUsersPage />} />
+        <Route path="audit" element={<GlobalAuditPage />} />
+        <Route path="settings" element={<PlatformSettingsPage />} />
       </Route>
+
+      {/* Tenant administration */}
+      <Route
+        path="/tenant"
+        element={
+          <RequireAuth>
+            <RequireTenant>
+              <TenantLayout />
+            </RequireTenant>
+          </RequireAuth>
+        }
+      >
+        <Route index element={<Navigate to="/tenant/dashboard" replace />} />
+        <Route path="dashboard" element={<TenantDashboardPage />} />
+        <Route path="users" element={<TenantUsersPage />} />
+        <Route path="roles" element={<TenantRolesPage />} />
+        <Route path="devices" element={<TenantDevicesPage />} />
+        <Route path="security" element={<SecurityCenterPage />} />
+        <Route path="audit" element={<TenantAuditPage />} />
+      </Route>
+
+      {/* Profile — accessible from both modes */}
+      <Route
+        path="/profile"
+        element={
+          <RequireAuth>
+            <ProfilePage />
+          </RequireAuth>
+        }
+      />
+
+      {/* Root redirect */}
+      <Route path="/" element={<RootRedirect />} />
 
       {/* Catch-all */}
       <Route
         path="*"
-        element={isInitialized ? <Navigate to="/dashboard" replace /> : <Navigate to="/setup" replace />}
+        element={isInitialized ? <Navigate to="/" replace /> : <Navigate to="/setup" replace />}
       />
     </Routes>
   )
