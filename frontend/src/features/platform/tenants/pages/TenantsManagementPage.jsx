@@ -47,6 +47,7 @@ function slugify(name) {
 
 const WIZARD_STEPS = ['Tenant Info', 'Owner Account', 'Review']
 const PLAN_OPTIONS = ['Free', 'Standard', 'Professional', 'Enterprise']
+const PLAN_VALUES = { Free: 0, Standard: 1, Professional: 2, Enterprise: 3 }
 
 // ─── Create Tenant Wizard ────────────────────────────────────────────────────
 function CreateTenantWizard({ open, onClose }) {
@@ -102,7 +103,7 @@ function CreateTenantWizard({ open, onClose }) {
     mutate({
       name: formData.name,
       slug: formData.slug,
-      plan: formData.plan,
+      plan: PLAN_VALUES[formData.plan],
       ownerFirstName: formData.ownerFirstName,
       ownerLastName: formData.ownerLastName,
       ownerEmail: formData.ownerEmail,
