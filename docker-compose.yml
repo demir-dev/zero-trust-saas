@@ -33,6 +33,7 @@ services:
       Jwt__Audience: ZeroTrustSaaS
       Jwt__ExpirationMinutes: "60"
       AllowedOrigins: "http://localhost:5173"
+      SEED_DEV_DATA: "true"   # set to "false" to skip pre-seeding and test the Setup Wizard
     ports:
       - "8080:8080"
     networks:
