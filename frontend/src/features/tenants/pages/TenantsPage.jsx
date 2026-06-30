@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import {
-  Box, Card, CardContent, Typography, Button, TextField,
+  Box, Card, Typography, Button, TextField,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Skeleton, Drawer, Stack
+  Skeleton, Dialog, DialogTitle, DialogContent, DialogActions, Stack
 } from '@mui/material'
 import { Add as AddIcon, Business as BusinessIcon } from '@mui/icons-material'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -31,7 +31,7 @@ function useTenants() {
 }
 
 export default function TenantsPage() {
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
   const [createError, setCreateError] = useState(null)
   const queryClient = useQueryClient()
   const { data, isLoading } = useTenants()
@@ -42,12 +42,18 @@ export default function TenantsPage() {
     mutationFn: (body) => api.post('/tenants', body),
     onSuccess: () => {
       queryClient.invalidateQueries(['tenants'])
-      setDrawerOpen(false)
+      setDialogOpen(false)
       reset()
       setCreateError(null)
     },
     onError: (err) => setCreateError(err),
   })
+
+  const handleClose = () => {
+    setDialogOpen(false)
+    reset()
+    setCreateError(null)
+  }
 
   const tenants = data?.items ?? []
 
@@ -57,7 +63,7 @@ export default function TenantsPage() {
         title="Tenants"
         subtitle="Manage your organizations"
         action={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDrawerOpen(true)}>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialogOpen(true)}>
             New Tenant
           </Button>
         }
@@ -115,22 +121,25 @@ export default function TenantsPage() {
         </TableContainer>
       </Card>
 
-      <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 400 }, p: 3 } }}
-      >
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Create Tenant</Typography>
-        <ProblemAlert error={createError} />
+      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Create Tenant</DialogTitle>
         <Box component="form" onSubmit={handleSubmit((d) => mutation.mutate(d))}>
-          <Stack spacing={2}>
-            <TextField label="Tenant Name" {...register('name')} error={!!errors.name} helperText={errors.name?.message} />
-            <TextField label="Slug" placeholder="my-org" {...register('slug')} error={!!errors.slug} helperText={errors.slug?.message} />
-            <TextField label="Owner User ID" placeholder="UUID" {...register('ownerUserId')} error={!!errors.ownerUserId} helperText={errors.ownerUserId?.message} />
-            <Button type="submit" variant="contained" size="large" disabled={mutation.isPending} fullWidth>
+          <DialogContent>
+            <ProblemAlert error={createError} />
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField label="Tenant Name" {...register('name')} error={!!errors.name} helperText={errors.name?.message} fullWidth />
+              <TextField label="Slug" placeholder="my-org" {...register('slug')} error={!!errors.slug} helperText={errors.slug?.message} fullWidth />
+              <TextField label="Owner User ID" placeholder="UUID" {...register('ownerUserId')} error={!!errors.ownerUserId} helperText={errors.ownerUserId?.message} fullWidth />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={handleClose} color="inherit">Cancel</Button>
+            <Button type="submit" variant="contained" disabled={mutation.isPending}>
               {mutation.isPending ? 'Creating…' : 'Create Tenant'}
             </Button>
-          </Stack>
+          </DialogActions>
         </Box>
-      </Drawer>
+      </Dialog>
     </motion.div>
   )
 }

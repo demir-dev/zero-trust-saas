@@ -15,40 +15,35 @@ public sealed class GetSecurityOverviewQueryHandler(
         GetSecurityOverviewQuery query,
         CancellationToken cancellationToken = default)
     {
-        var totalTenantsTask = tenantRepository.CountAsync(cancellationToken);
-        var totalUsersTask = userRepository.CountTotalAsync(cancellationToken);
-        var trustedDevicesTask = deviceRepository.CountByStatusAsync(DeviceStatus.Trusted, cancellationToken);
-        var revokedDevicesTask = deviceRepository.CountByStatusAsync(DeviceStatus.Revoked, cancellationToken);
-        var blockedDevicesTask = deviceRepository.CountByStatusAsync(DeviceStatus.Blocked, cancellationToken);
-        var auditCountTask = auditLogRepository.CountAsync(query.TenantId, cancellationToken);
-        var suspiciousTask = auditLogRepository.CountByEventTypeAsync(
+        // EF Core DbContext is not thread-safe — queries must run sequentially.
+        var totalTenants = await tenantRepository.CountAsync(cancellationToken);
+        var totalUsers = await userRepository.CountTotalAsync(cancellationToken);
+        var trustedDevices = await deviceRepository.CountByStatusAsync(DeviceStatus.Trusted, cancellationToken);
+        var revokedDevices = await deviceRepository.CountByStatusAsync(DeviceStatus.Revoked, cancellationToken);
+        var blockedDevices = await deviceRepository.CountByStatusAsync(DeviceStatus.Blocked, cancellationToken);
+        var auditCount = await auditLogRepository.CountAsync(query.TenantId, cancellationToken);
+        var suspicious = await auditLogRepository.CountByEventTypeAsync(
             SecurityEventType.SuspiciousLoginDetected,
             query.TenantId,
             cancellationToken);
-        var failedLoginTask = auditLogRepository.CountByEventTypeAsync(
+        var failedLogins = await auditLogRepository.CountByEventTypeAsync(
             SecurityEventType.LoginFailed,
             query.TenantId,
             cancellationToken);
-
-        await Task.WhenAll(
-            totalTenantsTask, totalUsersTask, trustedDevicesTask,
-            revokedDevicesTask, blockedDevicesTask, auditCountTask,
-            suspiciousTask, failedLoginTask);
-
         int mfaEnabled = query.TenantId.HasValue
             ? await userRepository.CountMfaEnabledAsync(query.TenantId.Value, cancellationToken)
             : 0;
 
         var dto = new SecurityOverviewDto(
-            totalTenantsTask.Result,
-            totalUsersTask.Result,
+            totalTenants,
+            totalUsers,
             mfaEnabled,
-            trustedDevicesTask.Result,
-            revokedDevicesTask.Result,
-            blockedDevicesTask.Result,
-            auditCountTask.Result,
-            suspiciousTask.Result,
-            failedLoginTask.Result);
+            trustedDevices,
+            revokedDevices,
+            blockedDevices,
+            auditCount,
+            suspicious,
+            failedLogins);
 
         return Result<SecurityOverviewDto>.Success(dto);
     }
