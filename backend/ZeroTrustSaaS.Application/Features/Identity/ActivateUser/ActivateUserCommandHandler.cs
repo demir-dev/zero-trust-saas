@@ -1,6 +1,7 @@
 using ZeroTrustSaaS.Application.Abstractions.Persistence;
 using ZeroTrustSaaS.Application.Abstractions.Repositories;
 using ZeroTrustSaaS.Application.Abstractions.Services;
+using ZeroTrustSaaS.Application.Common;
 using ZeroTrustSaaS.Domain.Audit;
 using ZeroTrustSaaS.Domain.Common;
 using ZeroTrustSaaS.Domain.Identity.Errors;
@@ -10,6 +11,7 @@ namespace ZeroTrustSaaS.Application.Features.Identity.ActivateUser;
 public sealed class ActivateUserCommandHandler(
     IUserRepository userRepository,
     IAuditLogRepository auditLogRepository,
+    ICurrentUserContext currentUser,
     IDateTimeProvider dateTimeProvider,
     IUnitOfWork unitOfWork)
 {
@@ -17,6 +19,8 @@ public sealed class ActivateUserCommandHandler(
         ActivateUserCommand command,
         CancellationToken cancellationToken = default)
     {
+        var permCheck = currentUser.RequirePermission(WellKnownPermissions.UserManage);
+        if (permCheck.IsFailure) return permCheck;
         var user = await userRepository.GetByIdAsync(command.UserId, cancellationToken);
 
         if (user is null)

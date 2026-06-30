@@ -1,6 +1,7 @@
 using ZeroTrustSaaS.Application.Abstractions.Persistence;
 using ZeroTrustSaaS.Application.Abstractions.Repositories;
 using ZeroTrustSaaS.Application.Abstractions.Services;
+using ZeroTrustSaaS.Application.Common;
 using ZeroTrustSaaS.Domain.Audit;
 using ZeroTrustSaaS.Domain.Authorization;
 using ZeroTrustSaaS.Domain.Authorization.Errors;
@@ -18,6 +19,7 @@ public sealed class CreateTenantUserCommandHandler(
     ITenantMembershipRepository membershipRepository,
     IRoleRepository roleRepository,
     IAuditLogRepository auditLogRepository,
+    ICurrentUserContext currentUser,
     IPasswordHasher passwordHasher,
     IDateTimeProvider dateTimeProvider,
     IUnitOfWork unitOfWork)
@@ -26,6 +28,8 @@ public sealed class CreateTenantUserCommandHandler(
         CreateTenantUserCommand command,
         CancellationToken cancellationToken = default)
     {
+        var permCheck = currentUser.RequirePermission(WellKnownPermissions.UserCreate);
+        if (permCheck.IsFailure) return Result<Guid>.Failure(permCheck.Error);
         var tenant = await tenantRepository.GetByIdAsync(command.TenantId, cancellationToken);
         if (tenant is null)
             return Result<Guid>.Failure(TenantErrors.NotFound);

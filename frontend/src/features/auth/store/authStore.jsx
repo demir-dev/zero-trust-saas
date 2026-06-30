@@ -99,7 +99,7 @@ export function AuthProvider({ children }) {
     const isPlatformUser = platformRoles.length > 0
     const hasTenantContext = !!tenantId
 
-    const hasPermission = (code) => permissions.includes(code)
+    const hasPermission = (code) => isPlatformUser || permissions.includes(code)
 
     return {
       accessToken,
