@@ -48,4 +48,8 @@ public static class TenantErrors
     public static readonly Error OwnerCannotBeRemoved =
         Error.Conflict("Tenants.Tenant.OwnerCannotBeRemoved",
             "The owner cannot be removed. Transfer ownership first.");
+
+    public static readonly Error InvalidStatusTransition =
+        Error.Conflict("Tenants.Tenant.InvalidStatusTransition",
+            "The tenant is not in a state that allows this transition.");
 }

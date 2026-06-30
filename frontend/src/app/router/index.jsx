@@ -1,9 +1,11 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { usePlatformStatus } from '../providers'
 import ProtectedRoute from './ProtectedRoute'
 import AppLayout from '../layout/AppLayout'
 
 import LoginPage from '../../features/auth/pages/LoginPage'
 import RegisterPage from '../../features/auth/pages/RegisterPage'
+import SetupWizardPage from '../../features/setup/pages/SetupWizardPage'
 import DashboardPage from '../../features/dashboard/pages/DashboardPage'
 import TenantsPage from '../../features/tenants/pages/TenantsPage'
 import UsersPage from '../../features/users/pages/UsersPage'
@@ -14,11 +16,26 @@ import MfaPage from '../../features/mfa/pages/MfaPage'
 import SettingsPage from '../../features/settings/pages/SettingsPage'
 
 export default function AppRouter() {
+  const { isInitialized } = usePlatformStatus()
+
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+      {/* Setup Wizard — only accessible when NOT initialized */}
+      <Route
+        path="/setup"
+        element={isInitialized ? <Navigate to="/login" replace /> : <SetupWizardPage />}
+      />
 
+      {/* Login — redirects to setup if not initialized */}
+      <Route
+        path="/login"
+        element={!isInitialized ? <Navigate to="/setup" replace /> : <LoginPage />}
+      />
+
+      {/* Register — public registration removed */}
+      <Route path="/register" element={<Navigate to="/login" replace />} />
+
+      {/* Protected app routes */}
       <Route
         path="/"
         element={
@@ -38,7 +55,11 @@ export default function AppRouter() {
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Catch-all */}
+      <Route
+        path="*"
+        element={isInitialized ? <Navigate to="/dashboard" replace /> : <Navigate to="/setup" replace />}
+      />
     </Routes>
   )
 }
