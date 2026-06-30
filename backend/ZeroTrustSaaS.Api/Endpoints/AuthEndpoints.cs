@@ -4,7 +4,6 @@ using ZeroTrustSaaS.Application.Features.Identity.Login;
 using ZeroTrustSaaS.Application.Features.Identity.Logout;
 using ZeroTrustSaaS.Application.Features.Identity.Mfa;
 using ZeroTrustSaaS.Application.Features.Identity.RefreshToken;
-using ZeroTrustSaaS.Application.Features.Identity.Register;
 
 namespace ZeroTrustSaaS.Api.Endpoints;
 
@@ -13,23 +12,6 @@ internal static class AuthEndpoints
     internal static void MapAuthEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/auth").WithTags("Auth");
-
-        group.MapPost("/register", async (
-            RegisterRequest request,
-            RegisterUserCommandHandler handler,
-            CancellationToken ct) =>
-        {
-            var command = new RegisterUserCommand(
-                request.TenantId,
-                request.Email,
-                request.Password);
-
-            var result = await handler.Handle(command, ct);
-
-            return result.IsSuccess
-                ? Results.Created($"/users/{result.Value}", new { id = result.Value })
-                : ApiErrors.Problem(result.Error);
-        });
 
         group.MapPost("/login", async (
             LoginRequest request,
@@ -41,7 +23,7 @@ internal static class AuthEndpoints
             var userAgent = httpContext.Request.Headers.UserAgent.ToString();
 
             var command = new LoginCommand(
-                request.TenantId,
+                request.TenantSlug,
                 request.Email,
                 request.Password,
                 ip,
@@ -129,13 +111,8 @@ internal static class AuthEndpoints
     }
 }
 
-internal sealed record RegisterRequest(
-    Guid TenantId,
-    string Email,
-    string Password);
-
 internal sealed record LoginRequest(
-    Guid TenantId,
+    string TenantSlug,
     string Email,
     string Password,
     string DeviceFingerprint,

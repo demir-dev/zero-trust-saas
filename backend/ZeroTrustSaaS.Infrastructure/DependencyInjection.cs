@@ -6,6 +6,7 @@ using ZeroTrustSaaS.Application.Abstractions.Repositories;
 using ZeroTrustSaaS.Application.Abstractions.Services;
 using ZeroTrustSaaS.Infrastructure.Persistence;
 using ZeroTrustSaaS.Infrastructure.Persistence.Repositories;
+using ZeroTrustSaaS.Infrastructure.Persistence.Seeding;
 using ZeroTrustSaaS.Infrastructure.Services;
 using ZeroTrustSaaS.Infrastructure.Settings;
 
@@ -38,6 +39,9 @@ public static class DependencyInjection
         services.AddSingleton<ITokenGenerator, JwtTokenGenerator>();
         services.AddSingleton<IDateTimeProvider, UtcDateTimeProvider>();
         services.AddSingleton<IMfaCodeValidator, TotpMfaCodeValidator>();
+
+        services.AddScoped<PermissionRegistrySeeder>();
+        services.AddScoped<DevelopmentDataSeeder>();
 
         return services;
     }

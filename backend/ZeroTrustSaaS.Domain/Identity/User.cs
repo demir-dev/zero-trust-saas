@@ -25,12 +25,16 @@ public sealed class User : SecureAggregateRoot
         Guid tenantId,
         Email email,
         PasswordHash passwordHash,
-        DateTime createdAtUtc)
+        DateTime createdAtUtc,
+        string? firstName,
+        string? lastName)
         : base(id)
     {
         TenantId = tenantId;
         Email = email;
         PasswordHash = passwordHash;
+        FirstName = firstName;
+        LastName = lastName;
         Status = UserStatus.PendingVerification;
         IsEmailConfirmed = false;
         IsMfaEnabled = false;
@@ -40,6 +44,13 @@ public sealed class User : SecureAggregateRoot
     }
 
     public Guid TenantId { get; private set; }
+
+    public string? FirstName { get; private set; }
+
+    public string? LastName { get; private set; }
+
+    public string DisplayName =>
+        string.IsNullOrWhiteSpace(FirstName) ? Email.Value : $"{FirstName} {LastName}".Trim();
 
     public Email Email { get; private set; } = null!;
 
@@ -86,7 +97,9 @@ public sealed class User : SecureAggregateRoot
         Guid tenantId,
         Email email,
         PasswordHash passwordHash,
-        DateTime createdAtUtc)
+        DateTime createdAtUtc,
+        string? firstName = null,
+        string? lastName = null)
     {
         if (tenantId == Guid.Empty)
             return Result<User>.Failure(UserErrors.InvalidTenantId);
@@ -96,7 +109,9 @@ public sealed class User : SecureAggregateRoot
             tenantId,
             email,
             passwordHash,
-            createdAtUtc);
+            createdAtUtc,
+            firstName?.Trim(),
+            lastName?.Trim());
 
         return Result<User>.Success(user);
     }

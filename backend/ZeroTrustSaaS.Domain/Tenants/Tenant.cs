@@ -20,7 +20,7 @@ public sealed class Tenant : AggregateRoot
     {
         Name = name;
         Slug = slug;
-        Status = TenantStatus.Active;
+        Status = TenantStatus.Provisioning;
         CreatedAtUtc = createdAtUtc;
     }
 
@@ -44,6 +44,16 @@ public sealed class Tenant : AggregateRoot
         var tenant = new Tenant(Guid.NewGuid(), name, slug, createdAtUtc);
 
         return Result<Tenant>.Success(tenant);
+    }
+
+    public Result Activate()
+    {
+        if (Status != TenantStatus.Provisioning)
+            return Result.Failure(TenantErrors.InvalidStatusTransition);
+
+        Status = TenantStatus.Active;
+
+        return Result.Success();
     }
 
     public Result Rename(TenantName name)

@@ -60,6 +60,14 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
                 .HasMaxLength(256);
         });
 
+        builder.Property(u => u.FirstName)
+            .HasColumnName("first_name")
+            .HasMaxLength(100);
+
+        builder.Property(u => u.LastName)
+            .HasColumnName("last_name")
+            .HasMaxLength(100);
+
         builder.Property(u => u.Version).IsRequired();
 
     }

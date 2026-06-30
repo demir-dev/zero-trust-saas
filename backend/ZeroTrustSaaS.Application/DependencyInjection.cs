@@ -21,6 +21,8 @@ using ZeroTrustSaaS.Application.Features.Identity.Register;
 using ZeroTrustSaaS.Application.Features.Identity.UnlockUser;
 using ZeroTrustSaaS.Application.Features.Tenants.CreateTenant;
 using ZeroTrustSaaS.Application.Features.Tenants.GetTenant;
+using ZeroTrustSaaS.Application.Features.Platform.CheckPlatformStatus;
+using ZeroTrustSaaS.Application.Features.Platform.InitializePlatform;
 using ZeroTrustSaaS.Application.Features.Tenants.GetTenants;
 
 namespace ZeroTrustSaaS.Application;
@@ -45,6 +47,8 @@ public static class DependencyInjection
         services.AddScoped<AssignRoleCommandHandler>();
         services.AddScoped<CreateRoleCommandHandler>();
         services.AddScoped<AssignPermissionToRoleCommandHandler>();
+        services.AddScoped<CheckPlatformStatusQueryHandler>();
+        services.AddScoped<InitializePlatformCommandHandler>();
 
         // Queries
         services.AddScoped<GetCurrentUserQueryHandler>();

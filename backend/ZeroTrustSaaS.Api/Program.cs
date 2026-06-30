@@ -8,6 +8,7 @@ using ZeroTrustSaaS.Application.Abstractions.Services;
 using Microsoft.EntityFrameworkCore;
 using ZeroTrustSaaS.Infrastructure;
 using ZeroTrustSaaS.Infrastructure.Persistence;
+using ZeroTrustSaaS.Infrastructure.Persistence.Seeding;
 using ZeroTrustSaaS.Infrastructure.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -62,14 +63,24 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
-if (app.Environment.IsDevelopment())
+// Runs in ALL environments — permissions are application metadata, not tenant data
 {
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
+    using var startupScope = app.Services.CreateScope();
+
+    var permissionSeeder = startupScope.ServiceProvider.GetRequiredService<PermissionRegistrySeeder>();
+    await permissionSeeder.SeedAsync();
+
+    if (app.Environment.IsDevelopment())
+    {
+        var db = startupScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Database.Migrate();
+        var devSeeder = startupScope.ServiceProvider.GetRequiredService<DevelopmentDataSeeder>();
+        await devSeeder.SeedAsync();
+    }
 }
 
 app.MapAuthEndpoints();
+app.MapPlatformEndpoints();
 app.MapDeviceEndpoints();
 app.MapTenantEndpoints();
 app.MapAuthorizationEndpoints();

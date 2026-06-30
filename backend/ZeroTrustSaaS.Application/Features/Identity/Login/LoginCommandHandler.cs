@@ -15,6 +15,7 @@ namespace ZeroTrustSaaS.Application.Features.Identity.Login;
 
 public sealed class LoginCommandHandler(
     IUserRepository userRepository,
+    ITenantRepository tenantRepository,
     IAuditLogRepository auditLogRepository,
     IPasswordHasher passwordHasher,
     ITokenGenerator tokenGenerator,
@@ -27,9 +28,15 @@ public sealed class LoginCommandHandler(
         LoginCommand command,
         CancellationToken cancellationToken = default)
     {
+        // Slug lookup — generic error on failure to prevent tenant enumeration
+        var normalizedSlug = command.TenantSlug.Trim().ToLowerInvariant();
+        var tenant = await tenantRepository.GetBySlugAsync(normalizedSlug, cancellationToken);
+        if (tenant is null || !tenant.IsActive)
+            return Result<LoginResponse>.Failure(UserErrors.InvalidCredentials);
+
         var user = await userRepository.GetByEmailAsync(
             command.Email,
-            command.TenantId,
+            tenant.Id,
             cancellationToken);
 
         var ipResult = IpAddress.Create(command.IpAddress);

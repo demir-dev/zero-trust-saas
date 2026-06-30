@@ -7,8 +7,13 @@ export function AuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState(() => sessionStorage.getItem('accessToken'))
   const [user, setUser] = useState(null)
 
-  const login = useCallback(async (credentials) => {
-    const res = await api.post('/auth/login', credentials)
+  const login = useCallback(async ({ organizationSlug, email, password, ...deviceInfo }) => {
+    const res = await api.post('/auth/login', {
+      tenantSlug: organizationSlug,
+      email,
+      password,
+      ...deviceInfo,
+    })
     const { accessToken: token, refreshToken } = res.data
     if (token) {
       sessionStorage.setItem('accessToken', token)
@@ -17,11 +22,6 @@ export function AuthProvider({ children }) {
     if (refreshToken) {
       localStorage.setItem('refreshToken', refreshToken)
     }
-    return res.data
-  }, [])
-
-  const register = useCallback(async (data) => {
-    const res = await api.post('/auth/register', data)
     return res.data
   }, [])
 
@@ -38,7 +38,7 @@ export function AuthProvider({ children }) {
   const isAuthenticated = !!accessToken
 
   return (
-    <AuthContext.Provider value={{ accessToken, user, setUser, login, register, logout, isAuthenticated }}>
+    <AuthContext.Provider value={{ accessToken, user, setUser, login, logout, isAuthenticated }}>
       {children}
     </AuthContext.Provider>
   )

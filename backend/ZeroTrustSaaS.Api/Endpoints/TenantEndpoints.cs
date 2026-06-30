@@ -53,7 +53,7 @@ internal static class TenantEndpoints
             return result.IsSuccess
                 ? Results.Created($"/tenants/{result.Value}", new { id = result.Value })
                 : ApiErrors.Problem(result.Error);
-        });
+        }).RequireAuthorization();
     }
 }
 
