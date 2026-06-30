@@ -13,6 +13,11 @@ import SetupWizardPage from '../../features/setup/pages/SetupWizardPage'
 
 import PlatformDashboardPage from '../../features/platform/dashboard/pages/PlatformDashboardPage'
 import TenantsManagementPage from '../../features/platform/tenants/pages/TenantsManagementPage'
+import TenantInspectionLayout from '../../features/platform/tenants/pages/TenantInspectionLayout'
+import TenantInspectionUsersPage from '../../features/platform/tenants/pages/TenantInspectionUsersPage'
+import TenantInspectionRolesPage from '../../features/platform/tenants/pages/TenantInspectionRolesPage'
+import TenantInspectionAuditPage from '../../features/platform/tenants/pages/TenantInspectionAuditPage'
+import TenantInspectionDevicesPage from '../../features/platform/tenants/pages/TenantInspectionDevicesPage'
 import PlatformUsersPage from '../../features/platform/users/pages/PlatformUsersPage'
 import GlobalAuditPage from '../../features/platform/audit/pages/GlobalAuditPage'
 import PlatformSettingsPage from '../../features/platform/settings/pages/PlatformSettingsPage'
@@ -68,6 +73,13 @@ export default function AppRouter() {
         <Route index element={<Navigate to="/platform/dashboard" replace />} />
         <Route path="dashboard" element={<PlatformDashboardPage />} />
         <Route path="tenants" element={<TenantsManagementPage />} />
+        <Route path="tenants/:tenantId" element={<TenantInspectionLayout />}>
+          <Route index element={<Navigate to="users" replace />} />
+          <Route path="users" element={<TenantInspectionUsersPage />} />
+          <Route path="roles" element={<TenantInspectionRolesPage />} />
+          <Route path="audit" element={<TenantInspectionAuditPage />} />
+          <Route path="devices" element={<TenantInspectionDevicesPage />} />
+        </Route>
         <Route path="users" element={<PlatformUsersPage />} />
         <Route path="audit" element={<GlobalAuditPage />} />
         <Route path="settings" element={<PlatformSettingsPage />} />
