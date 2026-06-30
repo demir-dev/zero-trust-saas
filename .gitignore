@@ -1,0 +1,75 @@
+# Build results
+bin/
+obj/
+[Bb]uild/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+artifacts/
+
+# .NET
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+project.lock.json
+project.fragment.lock.json
+artifacts/
+TestResults/
+coverage/
+coverage.xml
+coverage.opencover.xml
+*.trx
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+project.assets.json
+project.nuget.cache
+*.csproj.nuget.g.props
+*.csproj.nuget.g.targets
+*.nuget.dgspec.json
+
+# Rider / JetBrains
+.idea/
+*.DotSettings.user
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs
+*.log
+logs/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.local.json
+
+# Docker local overrides
+docker-compose.override.yml
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.next/
+.nuxt/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
