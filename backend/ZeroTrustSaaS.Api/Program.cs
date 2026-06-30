@@ -2,13 +2,17 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using ZeroTrustSaaS.Api.Endpoints;
+using ZeroTrustSaaS.Api.Services;
 using ZeroTrustSaaS.Application;
+using ZeroTrustSaaS.Application.Abstractions.Services;
 using ZeroTrustSaaS.Infrastructure;
 using ZeroTrustSaaS.Infrastructure.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserContext, HttpContextCurrentUserContext>();
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -36,12 +40,21 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddCors(options =>
+    options.AddDefaultPolicy(policy =>
+        policy.WithOrigins(
+                builder.Configuration["AllowedOrigins"] ?? "http://localhost:5173")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials()));
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 
 app.UseHttpsRedirection();
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -49,5 +62,7 @@ app.MapAuthEndpoints();
 app.MapDeviceEndpoints();
 app.MapTenantEndpoints();
 app.MapAuthorizationEndpoints();
+app.MapUserEndpoints();
+app.MapDashboardEndpoints();
 
 app.Run();

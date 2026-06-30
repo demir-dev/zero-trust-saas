@@ -18,4 +18,9 @@ public static class TrustedDeviceErrors
         Error.Conflict(
             "Devices.TrustedDevice.AlreadyRevoked",
             "The device has already been revoked.");
+
+    public static readonly Error NotFound =
+        Error.NotFound(
+            "Devices.TrustedDevice.NotFound",
+            "Trusted device was not found.");
 }

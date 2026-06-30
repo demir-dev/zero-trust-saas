@@ -1,5 +1,7 @@
 using ZeroTrustSaaS.Api.Helpers;
+using ZeroTrustSaaS.Application.Abstractions.Services;
 using ZeroTrustSaaS.Application.Features.Identity.Login;
+using ZeroTrustSaaS.Application.Features.Identity.Logout;
 using ZeroTrustSaaS.Application.Features.Identity.Mfa;
 using ZeroTrustSaaS.Application.Features.Identity.RefreshToken;
 using ZeroTrustSaaS.Application.Features.Identity.Register;
@@ -91,6 +93,19 @@ internal static class AuthEndpoints
                 request.Method,
                 request.Secret);
 
+            var result = await handler.Handle(command, ct);
+
+            return result.IsSuccess
+                ? Results.NoContent()
+                : ApiErrors.Problem(result.Error);
+        }).RequireAuthorization();
+
+        group.MapPost("/logout", async (
+            LogoutCommandHandler handler,
+            ICurrentUserContext currentUser,
+            CancellationToken ct) =>
+        {
+            var command = new LogoutCommand(currentUser.UserId, DateTime.UtcNow);
             var result = await handler.Handle(command, ct);
 
             return result.IsSuccess

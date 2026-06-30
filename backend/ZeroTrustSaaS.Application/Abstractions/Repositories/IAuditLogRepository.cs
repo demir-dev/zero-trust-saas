@@ -17,4 +17,16 @@ public interface IAuditLogRepository
         int page,
         int pageSize,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AuditLog>> GetRecentAsync(
+        int count,
+        Guid? tenantId,
+        CancellationToken cancellationToken = default);
+
+    Task<int> CountAsync(Guid? tenantId, CancellationToken cancellationToken = default);
+
+    Task<int> CountByEventTypeAsync(
+        SecurityEventType eventType,
+        Guid? tenantId,
+        CancellationToken cancellationToken = default);
 }
