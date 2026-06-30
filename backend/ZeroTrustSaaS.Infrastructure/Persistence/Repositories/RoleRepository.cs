@@ -77,4 +77,9 @@ internal sealed class RoleRepository(AppDbContext dbContext) : IRoleRepository
     {
         dbContext.UserRoles.Update(userRole);
     }
+
+    public void RemoveUserRole(UserRole userRole)
+    {
+        dbContext.UserRoles.Remove(userRole);
+    }
 }
