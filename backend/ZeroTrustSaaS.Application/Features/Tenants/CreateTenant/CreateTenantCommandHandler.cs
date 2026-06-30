@@ -3,6 +3,7 @@ using ZeroTrustSaaS.Application.Abstractions.Repositories;
 using ZeroTrustSaaS.Application.Abstractions.Services;
 using ZeroTrustSaaS.Application.Common;
 using ZeroTrustSaaS.Application.Features.Platform.Errors;
+using ZeroTrustSaaS.Domain.Audit;
 using ZeroTrustSaaS.Domain.Authorization;
 using ZeroTrustSaaS.Domain.Common;
 using ZeroTrustSaaS.Domain.Identity;
@@ -18,6 +19,7 @@ public sealed class CreateTenantCommandHandler(
     IUserRepository userRepository,
     IRoleRepository roleRepository,
     ITenantMembershipRepository membershipRepository,
+    IAuditLogRepository auditLogRepository,
     IPasswordHasher passwordHasher,
     IDateTimeProvider dateTimeProvider,
     IUnitOfWork unitOfWork)
@@ -41,7 +43,7 @@ public sealed class CreateTenantCommandHandler(
 
         var now = dateTimeProvider.UtcNow;
 
-        var tenantResult = Tenant.Create(nameResult.Value, slugResult.Value, command.Plan, now);
+        var tenantResult = Tenant.Create(nameResult.Value, slugResult.Value, now);
         if (tenantResult.IsFailure) return Result<Guid>.Failure(tenantResult.Error);
         var tenant = tenantResult.Value;
 
@@ -126,6 +128,14 @@ public sealed class CreateTenantCommandHandler(
         foreach (var role in createdRoles)
             await roleRepository.AddAsync(role, cancellationToken);
         await roleRepository.AddUserRoleAsync(userRoleResult.Value, cancellationToken);
+
+        var auditLog = AuditLog.Create(
+            SecurityEventType.TenantCreated,
+            AuditSeverity.Info,
+            now,
+            tenantId: tenant.Id,
+            userId: ownerUser.Id);
+        await auditLogRepository.AddAsync(auditLog.Value, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

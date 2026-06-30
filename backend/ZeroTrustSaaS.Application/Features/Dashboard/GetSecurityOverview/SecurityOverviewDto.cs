@@ -4,6 +4,7 @@ public sealed record SecurityOverviewDto(
     int TotalTenants,
     int TotalUsers,
     int MfaEnabledCount,
+    int LockedUsersCount,
     int TrustedDevicesCount,
     int RevokedDevicesCount,
     int BlockedDevicesCount,

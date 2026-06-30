@@ -1,20 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   Box, Button, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, MenuItem, Select, FormControl, InputLabel, Typography,
+  TextField, Typography,
   Chip, IconButton, Tooltip, Stepper, Step, StepLabel,
-  InputAdornment, LinearProgress, Card, CardContent, Alert,
+  InputAdornment, LinearProgress, Card, CardContent,
 } from '@mui/material'
 import {
   Add as AddIcon, Pause as SuspendIcon, PlayArrow as ActivateIcon,
-  CheckCircle as CheckIcon, Error as ErrorIcon, ArrowForward, ArrowBack,
+  CheckCircle as CheckIcon, ArrowForward, ArrowBack,
   Visibility, VisibilityOff, Business as BusinessIcon,
 } from '@mui/icons-material'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import api from '../../../../shared/api/axiosInstance'
 import PageHeader from '../../../../shared/components/PageHeader'
 import StatusChip from '../../../../shared/components/StatusChip'
@@ -26,7 +26,6 @@ import DataTable from '../../../../shared/components/DataTable'
 const tenantInfoSchema = z.object({
   name: z.string().min(2, 'At least 2 characters').max(100),
   slug: z.string().regex(/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/, '3–50 chars, lowercase, hyphens only'),
-  plan: z.enum(['Free', 'Standard', 'Professional', 'Enterprise']),
 })
 
 const ownerSchema = z.object({
@@ -46,8 +45,6 @@ function slugify(name) {
 }
 
 const WIZARD_STEPS = ['Tenant Info', 'Owner Account', 'Review']
-const PLAN_OPTIONS = ['Free', 'Standard', 'Professional', 'Enterprise']
-const PLAN_VALUES = { Free: 0, Standard: 1, Professional: 2, Enterprise: 3 }
 
 // ─── Create Tenant Wizard ────────────────────────────────────────────────────
 function CreateTenantWizard({ open, onClose }) {
@@ -58,11 +55,11 @@ function CreateTenantWizard({ open, onClose }) {
   const slugManual = useRef(false)
 
   const [formData, setFormData] = useState({
-    name: '', slug: '', plan: 'Free',
+    name: '', slug: '',
     ownerFirstName: '', ownerLastName: '', ownerEmail: '', ownerPassword: '',
   })
 
-  const infoForm = useForm({ resolver: zodResolver(tenantInfoSchema), defaultValues: { name: '', slug: '', plan: 'Free' } })
+  const infoForm = useForm({ resolver: zodResolver(tenantInfoSchema), defaultValues: { name: '', slug: '' } })
   const ownerForm = useForm({ resolver: zodResolver(ownerSchema), defaultValues: { ownerFirstName: '', ownerLastName: '', ownerEmail: '', ownerPassword: '' } })
 
   const nameValue = infoForm.watch('name', '')
@@ -84,7 +81,7 @@ function CreateTenantWizard({ open, onClose }) {
   const handleClose = () => {
     setStep(0); setMutError(null); slugManual.current = false
     infoForm.reset(); ownerForm.reset()
-    setFormData({ name: '', slug: '', plan: 'Free', ownerFirstName: '', ownerLastName: '', ownerEmail: '', ownerPassword: '' })
+    setFormData({ name: '', slug: '', ownerFirstName: '', ownerLastName: '', ownerEmail: '', ownerPassword: '' })
     onClose()
   }
 
@@ -103,7 +100,6 @@ function CreateTenantWizard({ open, onClose }) {
     mutate({
       name: formData.name,
       slug: formData.slug,
-      plan: PLAN_VALUES[formData.plan],
       ownerFirstName: formData.ownerFirstName,
       ownerLastName: formData.ownerLastName,
       ownerEmail: formData.ownerEmail,
@@ -143,12 +139,6 @@ function CreateTenantWizard({ open, onClose }) {
               error={!!infoForm.formState.errors.slug}
               helperText={infoForm.formState.errors.slug?.message ?? 'Used in login and as unique identifier'}
             />
-            <FormControl size="small">
-              <InputLabel>Subscription Plan</InputLabel>
-              <Select label="Subscription Plan" defaultValue="Free" {...infoForm.register('plan')}>
-                {PLAN_OPTIONS.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
-              </Select>
-            </FormControl>
           </Box>
         )}
 
@@ -199,9 +189,8 @@ function CreateTenantWizard({ open, onClose }) {
                   <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
                     <Typography variant="overline" color="text.secondary">Tenant</Typography>
                     <Typography variant="body1" fontWeight={600}>{formData.name}</Typography>
-                    <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
+                    <Box sx={{ mt: 0.5 }}>
                       <Chip label={formData.slug} size="small" />
-                      <Chip label={formData.plan} size="small" color="primary" />
                     </Box>
                   </CardContent>
                 </Card>
@@ -246,6 +235,7 @@ function CreateTenantWizard({ open, onClose }) {
 // ─── Main Page ───────────────────────────────────────────────────────────────
 export default function TenantsManagementPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 })
   const [wizardOpen, setWizardOpen] = useState(false)
   const [confirmAction, setConfirmAction] = useState(null)
@@ -268,8 +258,6 @@ export default function TenantsManagementPage() {
     { field: 'name', headerName: 'Name', flex: 1.5, minWidth: 140 },
     { field: 'slug', headerName: 'Slug', flex: 1, minWidth: 120,
       renderCell: ({ value }) => <Chip label={value} size="small" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }} /> },
-    { field: 'plan', headerName: 'Plan', width: 120,
-      renderCell: ({ value }) => <Chip label={value ?? 'Free'} size="small" color="primary" variant="outlined" /> },
     { field: 'status', headerName: 'Status', width: 120,
       renderCell: ({ value }) => <StatusChip status={value} /> },
     { field: 'memberCount', headerName: 'Members', width: 100, type: 'number' },
@@ -281,13 +269,13 @@ export default function TenantsManagementPage() {
         <Box sx={{ display: 'flex', gap: 0.5 }}>
           {row.status === 'Active' ? (
             <Tooltip title="Suspend">
-              <IconButton size="small" color="warning" onClick={() => setConfirmAction({ type: 'suspend', tenant: row })}>
+              <IconButton size="small" color="warning" onClick={(e) => { e.stopPropagation(); setConfirmAction({ type: 'suspend', tenant: row }) }}>
                 <SuspendIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           ) : (
             <Tooltip title="Activate">
-              <IconButton size="small" color="success" onClick={() => setConfirmAction({ type: 'activate', tenant: row })}>
+              <IconButton size="small" color="success" onClick={(e) => { e.stopPropagation(); setConfirmAction({ type: 'activate', tenant: row }) }}>
                 <ActivateIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -318,7 +306,8 @@ export default function TenantsManagementPage() {
             rowCount={data?.total ?? 0}
             paginationModel={paginationModel}
             onPaginationModelChange={setPaginationModel}
-            sx={{ minHeight: 400 }}
+            onRowClick={({ row }) => navigate(`/platform/tenants/${row.id}`)}
+            sx={{ minHeight: 400, cursor: 'pointer' }}
           />
         </CardContent>
       </Card>

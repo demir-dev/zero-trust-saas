@@ -1,5 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using System.Text.Json;
 using ZeroTrustSaaS.Domain.Identity;
 
 namespace ZeroTrustSaaS.Infrastructure.Persistence.Configurations;
@@ -67,6 +70,23 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.LastName)
             .HasColumnName("last_name")
             .HasMaxLength(100);
+
+        var recoveryCodesConverter = new ValueConverter<List<string>, string?>(
+            v => v.Count == 0 ? null : JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+            v => string.IsNullOrEmpty(v)
+                ? new List<string>()
+                : JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null)!);
+
+        var recoveryCodesComparer = new ValueComparer<List<string>>(
+            (c1, c2) => c1!.SequenceEqual(c2!),
+            c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+            c => c.ToList());
+
+        builder.Property(u => u.MfaRecoveryCodeHashes)
+            .HasColumnName("mfa_recovery_code_hashes")
+            .HasColumnType("text")
+            .HasConversion(recoveryCodesConverter, recoveryCodesComparer)
+            .IsRequired(false);
 
         builder.Property(u => u.Version).IsRequired();
     }

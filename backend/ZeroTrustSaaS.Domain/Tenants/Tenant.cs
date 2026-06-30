@@ -15,13 +15,11 @@ public sealed class Tenant : AggregateRoot
         Guid id,
         TenantName name,
         TenantSlug slug,
-        TenantPlan plan,
         DateTime createdAtUtc)
         : base(id)
     {
         Name = name;
         Slug = slug;
-        Plan = plan;
         Status = TenantStatus.Provisioning;
         CreatedAtUtc = createdAtUtc;
     }
@@ -29,8 +27,6 @@ public sealed class Tenant : AggregateRoot
     public TenantName Name { get; private set; } = null!;
 
     public TenantSlug Slug { get; private set; } = null!;
-
-    public TenantPlan Plan { get; private set; }
 
     public TenantStatus Status { get; private set; }
 
@@ -49,10 +45,9 @@ public sealed class Tenant : AggregateRoot
     public static Result<Tenant> Create(
         TenantName name,
         TenantSlug slug,
-        TenantPlan plan,
         DateTime createdAtUtc)
     {
-        var tenant = new Tenant(Guid.NewGuid(), name, slug, plan, createdAtUtc);
+        var tenant = new Tenant(Guid.NewGuid(), name, slug, createdAtUtc);
 
         return Result<Tenant>.Success(tenant);
     }

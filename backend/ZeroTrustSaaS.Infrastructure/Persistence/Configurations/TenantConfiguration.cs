@@ -32,10 +32,6 @@ internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
                 .HasDatabaseName("ix_tenants_slug");
         });
 
-        builder.Property(t => t.Plan)
-            .HasConversion<int>()
-            .IsRequired();
-
         builder.Property(t => t.Status)
             .HasConversion<int>()
             .IsRequired();

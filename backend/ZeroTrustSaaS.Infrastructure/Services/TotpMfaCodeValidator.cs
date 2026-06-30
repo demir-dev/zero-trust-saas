@@ -1,3 +1,4 @@
+using OtpNet;
 using ZeroTrustSaaS.Application.Abstractions.Services;
 using ZeroTrustSaaS.Domain.Security.Enums;
 
@@ -7,9 +8,24 @@ internal sealed class TotpMfaCodeValidator : IMfaCodeValidator
 {
     public bool Validate(string secret, string code, MfaMethod method)
     {
-        // TOTP validation requires a library like OtpNet.
-        // This is a stub that returns true for the diploma demo.
-        // Replace with real OtpNet implementation before production.
-        return !string.IsNullOrWhiteSpace(code);
+        if (method != MfaMethod.Totp)
+            return false;
+
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(secret))
+            return false;
+
+        try
+        {
+            var keyBytes = Base32Encoding.ToBytes(secret);
+            var totp = new Totp(keyBytes);
+            return totp.VerifyTotp(
+                code.Trim(),
+                out _,
+                window: new VerificationWindow(previous: 1, future: 1));
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

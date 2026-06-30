@@ -29,6 +29,36 @@ internal sealed class UserRepository(AppDbContext dbContext) : IUserRepository
         return dbContext.Users.CountAsync(cancellationToken);
     }
 
+    public Task<int> CountMfaEnabledAsync(CancellationToken cancellationToken = default)
+    {
+        return dbContext.Users.CountAsync(u => u.IsMfaEnabled, cancellationToken);
+    }
+
+    public Task<int> CountLockedAsync(CancellationToken cancellationToken = default)
+    {
+        return dbContext.Users.CountAsync(
+            u => u.Status == UserStatus.Locked && u.LockedUntilUtc > DateTime.UtcNow,
+            cancellationToken);
+    }
+
+    public Task<int> CountMfaEnabledByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.TenantMemberships
+            .Where(m => m.TenantId == tenantId)
+            .Join(dbContext.Users, m => m.UserId, u => u.Id, (m, u) => u)
+            .CountAsync(u => u.IsMfaEnabled, cancellationToken);
+    }
+
+    public Task<int> CountLockedByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.TenantMemberships
+            .Where(m => m.TenantId == tenantId)
+            .Join(dbContext.Users, m => m.UserId, u => u.Id, (m, u) => u)
+            .CountAsync(
+                u => u.Status == UserStatus.Locked && u.LockedUntilUtc > DateTime.UtcNow,
+                cancellationToken);
+    }
+
     public Task AddAsync(User user, CancellationToken cancellationToken = default)
     {
         return dbContext.Users.AddAsync(user, cancellationToken).AsTask();

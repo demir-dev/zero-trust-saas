@@ -14,6 +14,7 @@ public sealed class User : SecureAggregateRoot
 
     private readonly List<LoginAttempt> _loginAttempts = [];
     private readonly List<RefreshToken> _refreshTokens = [];
+    private List<string> _mfaRecoveryCodes = [];
 
     private User()
     {
@@ -73,6 +74,12 @@ public sealed class User : SecureAggregateRoot
     public MfaMethod MfaMethod { get; private set; }
 
     public MfaSecret? MfaSecret { get; private set; }
+
+    public List<string> MfaRecoveryCodeHashes
+    {
+        get => _mfaRecoveryCodes;
+        private set => _mfaRecoveryCodes = value;
+    }
 
     public IReadOnlyCollection<LoginAttempt> LoginAttempts => _loginAttempts.AsReadOnly();
 
@@ -196,11 +203,22 @@ public sealed class User : SecureAggregateRoot
         IsMfaEnabled = false;
         MfaMethod = MfaMethod.None;
         MfaSecret = null;
+        _mfaRecoveryCodes.Clear();
 
         RevokeAllRefreshTokens(disabledAtUtc);
         RefreshSecurityStamp();
 
         return Result.Success();
+    }
+
+    public void SetRecoveryCodeHashes(IReadOnlyList<string> hashes)
+    {
+        _mfaRecoveryCodes = hashes.ToList();
+    }
+
+    public bool ConsumeRecoveryCode(string hash)
+    {
+        return _mfaRecoveryCodes.Remove(hash);
     }
 
     public Result LockUntil(

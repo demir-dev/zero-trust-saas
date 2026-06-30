@@ -23,4 +23,13 @@ public enum SecurityEventType
     RoleAssigned = 19,
     RoleRevoked = 20,
     PermissionAssigned = 21,
+    TenantCreated = 22,
+    UserCreated = 23,
+    RoleDeleted = 24,
+    PermissionRemoved = 25,
+    SessionsRevoked = 26,
+    UserActivated = 27,
+    PasswordResetForced = 28,
+    MfaFailed = 29,
+    MfaSucceeded = 30,
 }

@@ -15,8 +15,19 @@ public interface ITrustedDeviceRepository
         Guid userId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<TrustedDevice>> GetByTenantIdAsync(
+        Guid tenantId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
     Task<int> CountByStatusAsync(
         DeviceStatus status,
+        CancellationToken cancellationToken = default);
+
+    Task<int> CountByStatusAndTenantAsync(
+        DeviceStatus status,
+        Guid tenantId,
         CancellationToken cancellationToken = default);
 
     Task<int> CountTotalAsync(CancellationToken cancellationToken = default);

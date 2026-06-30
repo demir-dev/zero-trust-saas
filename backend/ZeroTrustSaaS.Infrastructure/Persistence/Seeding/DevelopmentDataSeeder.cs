@@ -1,6 +1,5 @@
 using ZeroTrustSaaS.Application.Features.Platform.InitializePlatform;
 using ZeroTrustSaaS.Application.Features.Tenants.CreateTenant;
-using ZeroTrustSaaS.Domain.Tenants;
 
 namespace ZeroTrustSaaS.Infrastructure.Persistence.Seeding;
 
@@ -28,7 +27,6 @@ public sealed class DevelopmentDataSeeder(
             new CreateTenantCommand(
                 Name: "ZeroTrust Labs",
                 Slug: "zerotrust",
-                Plan: TenantPlan.Standard,
                 OwnerFirstName: "Tenant",
                 OwnerLastName: "Admin",
                 OwnerEmail: "admin@zerotrust.local",
