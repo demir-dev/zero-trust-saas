@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import {
   Box, Card, CardContent, Typography, Avatar, Chip, Divider,
-  Button, TextField, Alert, Stack, Grid, IconButton, Tooltip,
-  Skeleton, Switch, FormControlLabel,
+  Button, TextField, Alert, Stack, IconButton, Tooltip,
+  Skeleton, FormControlLabel, Checkbox, Dialog, DialogTitle,
+  DialogContent, DialogActions, Stepper, Step, StepLabel,
 } from '@mui/material'
 import {
   Person as PersonIcon,
@@ -13,7 +14,13 @@ import {
   RemoveCircle as RevokeIcon,
   ArrowBack as BackIcon,
   Computer, Language, LocationOn,
+  ContentCopy as CopyIcon,
+  Check as CheckIcon,
+  QrCode2 as QrCodeIcon,
+  VerifiedUser as VerifiedIcon,
+  Key as KeyIcon,
 } from '@mui/icons-material'
+import { QRCodeSVG } from 'qrcode.react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import api from '../../../shared/api/axiosInstance'
@@ -88,32 +95,249 @@ function AccountSection({ me, loading }) {
   )
 }
 
+const WIZARD_STEPS = ['Scan QR Code', 'Verify Code', 'Save Recovery Codes']
+
+function MfaSetupWizard({ open, onClose, onComplete }) {
+  const [step, setStep] = useState(0)
+  const [setupData, setSetupData] = useState(null)
+  const [verifyCode, setVerifyCode] = useState('')
+  const [recoveryCodes, setRecoveryCodes] = useState([])
+  const [copied, setCopied] = useState(false)
+  const [confirmed, setConfirmed] = useState(false)
+  const [verifyError, setVerifyError] = useState(null)
+
+  const setupQuery = useQuery({
+    queryKey: ['mfa', 'setup'],
+    queryFn: () => api.get('/auth/mfa/setup').then(r => r.data),
+    enabled: open,
+    staleTime: Infinity,
+  })
+
+  const verifyMutation = useMutation({
+    mutationFn: ({ base32Secret, verificationCode }) =>
+      api.post('/auth/mfa/verify-enable', { base32Secret, verificationCode }).then(r => r.data),
+    onSuccess: (data) => {
+      setRecoveryCodes(data.recoveryCodes)
+      setVerifyError(null)
+      setStep(2)
+    },
+    onError: (err) => setVerifyError(err),
+  })
+
+  const handleVerify = () => {
+    if (!verifyCode.trim() || !setupQuery.data?.secret) return
+    verifyMutation.mutate({
+      base32Secret: setupQuery.data.secret,
+      verificationCode: verifyCode.trim(),
+    })
+  }
+
+  const handleCopyAll = () => {
+    navigator.clipboard.writeText(recoveryCodes.join('\n'))
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleDone = () => {
+    onComplete()
+    onClose()
+  }
+
+  const handleClose = () => {
+    if (step < 2) {
+      onClose()
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{ sx: { borderRadius: 3 } }}
+    >
+      <DialogTitle sx={{ pb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <MfaIcon sx={{ color: 'primary.main' }} />
+          <Typography variant="h6" fontWeight={600}>Set Up Authenticator App</Typography>
+        </Box>
+      </DialogTitle>
+
+      <DialogContent>
+        <Stepper activeStep={step} sx={{ mb: 3 }}>
+          {WIZARD_STEPS.map((label) => (
+            <Step key={label}><StepLabel>{label}</StepLabel></Step>
+          ))}
+        </Stepper>
+
+        {step === 0 && (
+          <Stack spacing={2.5} alignItems="center">
+            <Typography variant="body2" color="text.secondary" textAlign="center">
+              Scan this QR code with Google Authenticator, Authy, or any TOTP-compatible app.
+            </Typography>
+
+            {setupQuery.isLoading ? (
+              <Skeleton variant="rectangular" width={200} height={200} sx={{ borderRadius: 2 }} />
+            ) : setupQuery.data ? (
+              <Box sx={{ p: 2, bgcolor: '#fff', borderRadius: 2, boxShadow: 1 }}>
+                <QRCodeSVG value={setupQuery.data.qrCodeUri} size={200} />
+              </Box>
+            ) : null}
+
+            <Box sx={{ width: '100%' }}>
+              <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+                Or enter this key manually:
+              </Typography>
+              <Box
+                sx={{
+                  fontFamily: 'monospace',
+                  fontSize: '0.8rem',
+                  letterSpacing: 2,
+                  bgcolor: 'action.hover',
+                  p: 1.5,
+                  borderRadius: 1.5,
+                  wordBreak: 'break-all',
+                  color: 'text.primary',
+                }}
+              >
+                {setupQuery.data?.secret ?? '—'}
+              </Box>
+            </Box>
+          </Stack>
+        )}
+
+        {step === 1 && (
+          <Stack spacing={2.5}>
+            <Typography variant="body2" color="text.secondary">
+              Enter the 6-digit code from your authenticator app to confirm the setup.
+            </Typography>
+            <ProblemAlert error={verifyError} />
+            <TextField
+              label="Verification Code"
+              value={verifyCode}
+              onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              inputProps={{ maxLength: 6, inputMode: 'numeric' }}
+              placeholder="123456"
+              autoFocus
+              fullWidth
+              size="small"
+              onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
+            />
+          </Stack>
+        )}
+
+        {step === 2 && (
+          <Stack spacing={2.5}>
+            <Alert severity="warning" icon={<KeyIcon />} sx={{ borderRadius: 2 }}>
+              Save these recovery codes now. They will not be shown again. Each code can only be used once.
+            </Alert>
+
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 1,
+                p: 2,
+                bgcolor: 'action.hover',
+                borderRadius: 2,
+              }}
+            >
+              {recoveryCodes.map((code) => (
+                <Typography
+                  key={code}
+                  sx={{ fontFamily: 'monospace', fontSize: '0.875rem', letterSpacing: 1 }}
+                >
+                  {code}
+                </Typography>
+              ))}
+            </Box>
+
+            <Button
+              variant="outlined"
+              startIcon={copied ? <CheckIcon /> : <CopyIcon />}
+              onClick={handleCopyAll}
+              color={copied ? 'success' : 'inherit'}
+              size="small"
+            >
+              {copied ? 'Copied!' : 'Copy All Codes'}
+            </Button>
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={confirmed}
+                  onChange={(e) => setConfirmed(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label={
+                <Typography variant="body2">
+                  I have saved my recovery codes in a safe place
+                </Typography>
+              }
+            />
+          </Stack>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        {step === 0 && (
+          <>
+            <Button onClick={onClose} color="inherit">Cancel</Button>
+            <Button
+              variant="contained"
+              onClick={() => setStep(1)}
+              disabled={!setupQuery.data}
+              startIcon={<QrCodeIcon />}
+            >
+              I've Scanned the Code
+            </Button>
+          </>
+        )}
+
+        {step === 1 && (
+          <>
+            <Button onClick={() => setStep(0)} color="inherit">Back</Button>
+            <Button
+              variant="contained"
+              onClick={handleVerify}
+              disabled={verifyMutation.isPending || verifyCode.length < 6}
+              startIcon={<VerifiedIcon />}
+            >
+              {verifyMutation.isPending ? 'Verifying…' : 'Verify'}
+            </Button>
+          </>
+        )}
+
+        {step === 2 && (
+          <Button
+            variant="contained"
+            onClick={handleDone}
+            disabled={!confirmed}
+            fullWidth
+          >
+            Done — MFA Is Now Active
+          </Button>
+        )}
+      </DialogActions>
+    </Dialog>
+  )
+}
+
 function MfaSection({ me, loading }) {
   const queryClient = useQueryClient()
-  const [secret, setSecret] = useState('')
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [error, setError] = useState(null)
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [confirmDisableOpen, setConfirmDisableOpen] = useState(false)
 
   const isMfaEnabled = me?.isMfaEnabled ?? false
-
-  const enableMutation = useMutation({
-    mutationFn: (data) => api.post('/auth/mfa/enable', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users', 'me'] })
-      setError(null)
-      setSecret('')
-    },
-    onError: setError,
-  })
 
   const disableMutation = useMutation({
     mutationFn: () => api.post('/auth/mfa/disable', { userId: me?.id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', 'me'] })
-      setConfirmOpen(false)
-      setError(null)
+      setConfirmDisableOpen(false)
     },
-    onError: setError,
   })
 
   return (
@@ -126,50 +350,48 @@ function MfaSection({ me, loading }) {
 
         {loading ? <Skeleton height={80} /> : (
           <>
-            <ProblemAlert error={error} />
-
             {isMfaEnabled ? (
               <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
-                MFA is enabled on your account ({me.mfaMethod}).
+                MFA is enabled on your account (TOTP authenticator app).
               </Alert>
             ) : (
               <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
-                MFA is not enabled. Add it for stronger account security.
+                MFA is not enabled. Enable it to protect your account with a second factor.
               </Alert>
             )}
 
             {!isMfaEnabled && (
-              <Stack spacing={2}>
-                <TextField
-                  label="TOTP Secret"
-                  value={secret}
-                  onChange={(e) => setSecret(e.target.value)}
-                  placeholder="Base32 TOTP secret from your authenticator app"
-                  size="small"
-                  helperText="Generate a TOTP secret from your authenticator app (e.g. Google Authenticator, Authy)"
-                />
-                <Button
-                  variant="contained"
-                  onClick={() => enableMutation.mutate({ userId: me?.id, method: 1, secret })}
-                  disabled={enableMutation.isPending || !me?.id || !secret}
-                >
-                  {enableMutation.isPending ? 'Enabling…' : 'Enable TOTP MFA'}
-                </Button>
-              </Stack>
+              <Button
+                variant="contained"
+                startIcon={<QrCodeIcon />}
+                onClick={() => setWizardOpen(true)}
+              >
+                Set Up Authenticator App
+              </Button>
             )}
 
             {isMfaEnabled && (
-              <Button variant="outlined" color="error" onClick={() => setConfirmOpen(true)}>
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={() => setConfirmDisableOpen(true)}
+              >
                 Disable MFA
               </Button>
             )}
 
+            <MfaSetupWizard
+              open={wizardOpen}
+              onClose={() => setWizardOpen(false)}
+              onComplete={() => queryClient.invalidateQueries({ queryKey: ['users', 'me'] })}
+            />
+
             <ConfirmDialog
-              open={confirmOpen}
+              open={confirmDisableOpen}
               title="Disable MFA?"
-              message="This will remove multi-factor authentication from your account. All active sessions may be revoked."
+              message="This will remove multi-factor authentication from your account. All active sessions will be revoked."
               onConfirm={() => disableMutation.mutate()}
-              onCancel={() => setConfirmOpen(false)}
+              onCancel={() => setConfirmDisableOpen(false)}
             />
           </>
         )}

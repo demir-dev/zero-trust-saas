@@ -8,6 +8,7 @@ import {
 import {
   Visibility, VisibilityOff, Shield as ShieldIcon,
   Lock as LockIcon, Domain as DomainIcon,
+  PhonelinkLock as MfaIcon,
 } from '@mui/icons-material'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useForm } from 'react-hook-form'
@@ -35,14 +36,47 @@ const slideVariants = {
 export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { login, loginWithTenant } = useAuth()
+  const { login, loginWithTenant, verifyMfa } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [phase, setPhase] = useState(0) // 0=credentials, 1=org-slug
+  const [phase, setPhase] = useState(0) // 0=credentials, 1=org-slug, 2=mfa
   const [savedCreds, setSavedCreds] = useState(null)
+  const [mfaPending, setMfaPending] = useState(null) // { userId, tenantSlug }
+  const [mfaCode, setMfaCode] = useState('')
+  const [useRecovery, setUseRecovery] = useState(false)
 
   const initMessage = location.state?.message
+
+  const onMfaSubmit = async () => {
+    if (!mfaCode.trim() || !mfaPending) return
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await verifyMfa(
+        mfaPending.userId,
+        mfaPending.tenantSlug,
+        mfaCode.trim(),
+        useRecovery,
+        deviceInfo,
+      )
+      if (!result.accessToken) {
+        setError({ response: { data: { title: 'Invalid code', detail: 'The code you entered is incorrect. Please try again.' } } })
+        return
+      }
+      const { parseJwtClaims } = await import('../../../shared/utils/jwt')
+      const claims = parseJwtClaims(result.accessToken)
+      if (claims.platformRoles?.length > 0) {
+        navigate('/platform')
+      } else {
+        navigate('/tenant')
+      }
+    } catch (err) {
+      setError(err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const credForm = useForm({
     resolver: zodResolver(credSchema),
@@ -70,8 +104,11 @@ export default function LoginPage() {
         setError({ response: { data: { title: 'Invalid credentials', detail: 'The email or password you entered is incorrect.' } } })
         return
       }
-      if (result.result === 'MfaRequired') {
-        setError({ response: { data: { title: 'MFA required', detail: 'Multi-factor authentication is required. Please contact your administrator.' } } })
+      if (result.requiresMfa) {
+        setMfaPending({ userId: result.userId, tenantSlug: null })
+        setMfaCode('')
+        setUseRecovery(false)
+        setPhase(2)
         return
       }
       const { isPlatformUser, hasTenantContext } = window.__authContextRef ?? {}
@@ -103,6 +140,13 @@ export default function LoginPage() {
       )
       if (result.result === 'InvalidCredentials') {
         setError({ response: { data: { title: 'Invalid credentials', detail: 'The email, password, or organization slug is incorrect.' } } })
+        return
+      }
+      if (result.requiresMfa) {
+        setMfaPending({ userId: result.userId, tenantSlug: data.tenantSlug.trim() })
+        setMfaCode('')
+        setUseRecovery(false)
+        setPhase(2)
         return
       }
       navigate('/tenant')
@@ -137,7 +181,7 @@ export default function LoginPage() {
           </Box>
           <Typography variant="h4" fontWeight={700}>ZeroTrust SaaS</Typography>
           <Typography variant="body2" color="text.secondary" mt={0.5}>
-            {phase === 0 ? 'Sign in to your account' : 'Enter your organization'}
+            {phase === 0 ? 'Sign in to your account' : phase === 1 ? 'Enter your organization' : 'Two-factor authentication'}
           </Typography>
         </Box>
 
@@ -269,6 +313,67 @@ export default function LoginPage() {
                         {loading ? 'Signing in…' : 'Continue'}
                       </Button>
                     </Box>
+                  </Box>
+                </motion.div>
+              )}
+
+              {phase === 2 && (
+                <motion.div
+                  key="mfa"
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.2 }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                    <MfaIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+                    <Typography variant="h6" fontWeight={600}>Verify Your Identity</Typography>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" mb={2.5}>
+                    {useRecovery
+                      ? 'Enter one of your recovery codes.'
+                      : 'Enter the 6-digit code from your authenticator app.'}
+                  </Typography>
+
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <TextField
+                      label={useRecovery ? 'Recovery Code' : 'Authentication Code'}
+                      value={mfaCode}
+                      onChange={(e) =>
+                        setMfaCode(
+                          useRecovery
+                            ? e.target.value.toUpperCase()
+                            : e.target.value.replace(/\D/g, '').slice(0, 6),
+                        )
+                      }
+                      inputProps={{
+                        maxLength: useRecovery ? 9 : 6,
+                        inputMode: useRecovery ? 'text' : 'numeric',
+                      }}
+                      placeholder={useRecovery ? 'XXXX-XXXX' : '123456'}
+                      size="small"
+                      autoFocus
+                      onKeyDown={(e) => e.key === 'Enter' && onMfaSubmit()}
+                    />
+                    <Button
+                      variant="contained"
+                      size="large"
+                      fullWidth
+                      disabled={loading || (!useRecovery && mfaCode.length < 6) || (useRecovery && mfaCode.length < 9)}
+                      startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <MfaIcon />}
+                      onClick={onMfaSubmit}
+                    >
+                      {loading ? 'Verifying…' : 'Verify'}
+                    </Button>
+                    <Button
+                      variant="text"
+                      size="small"
+                      color="inherit"
+                      onClick={() => { setUseRecovery((r) => !r); setMfaCode(''); setError(null) }}
+                    >
+                      {useRecovery ? 'Use authenticator app instead' : 'Use a recovery code instead'}
+                    </Button>
                   </Box>
                 </motion.div>
               )}
