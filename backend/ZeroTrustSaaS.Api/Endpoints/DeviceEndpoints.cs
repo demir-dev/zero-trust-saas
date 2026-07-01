@@ -4,6 +4,8 @@ using ZeroTrustSaaS.Application.Features.Devices.BlockDevice;
 using ZeroTrustSaaS.Application.Features.Devices.GetDevices;
 using ZeroTrustSaaS.Application.Features.Devices.RevokeDevice;
 using ZeroTrustSaaS.Application.Features.Devices.TrustDevice;
+using ZeroTrustSaaS.Application.Features.Devices.TrustDeviceById;
+using ZeroTrustSaaS.Application.Features.Devices.UnblockDevice;
 
 namespace ZeroTrustSaaS.Api.Endpoints;
 
@@ -49,6 +51,32 @@ internal static class DeviceEndpoints
 
             return result.IsSuccess
                 ? Results.Created($"/devices/{result.Value}", new { id = result.Value })
+                : ApiErrors.Problem(result.Error);
+        });
+
+        group.MapPost("/{id:guid}/trust", async (
+            Guid id,
+            TrustDeviceByIdCommandHandler handler,
+            CancellationToken ct) =>
+        {
+            var command = new TrustDeviceByIdCommand(id);
+            var result = await handler.Handle(command, ct);
+
+            return result.IsSuccess
+                ? Results.NoContent()
+                : ApiErrors.Problem(result.Error);
+        });
+
+        group.MapPost("/{id:guid}/unblock", async (
+            Guid id,
+            UnblockDeviceCommandHandler handler,
+            CancellationToken ct) =>
+        {
+            var command = new UnblockDeviceCommand(id);
+            var result = await handler.Handle(command, ct);
+
+            return result.IsSuccess
+                ? Results.NoContent()
                 : ApiErrors.Problem(result.Error);
         });
 

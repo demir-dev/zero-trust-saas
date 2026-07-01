@@ -13,6 +13,7 @@ public sealed class TrustDeviceCommandHandler(
     IUserRepository userRepository,
     ITrustedDeviceRepository trustedDeviceRepository,
     IAuditLogRepository auditLogRepository,
+    IDeviceStatusCache deviceStatusCache,
     IDateTimeProvider dateTimeProvider,
     IUnitOfWork unitOfWork)
 {
@@ -75,6 +76,7 @@ public sealed class TrustDeviceCommandHandler(
                 await auditLogRepository.AddAsync(existingLogResult.Value, cancellationToken);
 
             await unitOfWork.SaveChangesAsync(cancellationToken);
+            deviceStatusCache.Invalidate(existingDevice.Id);
             return Result<Guid>.Success(existingDevice.Id);
         }
 
@@ -103,6 +105,7 @@ public sealed class TrustDeviceCommandHandler(
             await auditLogRepository.AddAsync(logResult.Value, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        deviceStatusCache.Invalidate(device.Id);
 
         return Result<Guid>.Success(device.Id);
     }

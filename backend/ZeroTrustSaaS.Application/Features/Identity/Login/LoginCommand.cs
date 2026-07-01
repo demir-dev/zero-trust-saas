@@ -9,4 +9,5 @@ public sealed record LoginCommand(
     string DeviceFingerprint,
     string Country,
     string Browser,
-    string OperatingSystem);
+    string OperatingSystem,
+    bool TrustDevice = false);

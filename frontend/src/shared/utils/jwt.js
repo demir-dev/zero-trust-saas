@@ -9,12 +9,14 @@ export function parseJwtClaims(token) {
       tenantId: payload.tenant_id ?? null,
       tenantRole: payload.tenant_role ?? null,
       permissions: [].concat(payload.permission ?? []),
+      sessionId: payload.session_id ?? null,
+      deviceId: payload.device_id ?? null,
       exp: payload.exp ?? null,
     }
   } catch {
     return {
       sub: null, email: null, platformRoles: [], tenantId: null,
-      tenantRole: null, permissions: [], exp: null,
+      tenantRole: null, permissions: [], sessionId: null, deviceId: null, exp: null,
     }
   }
 }

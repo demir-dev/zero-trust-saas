@@ -41,7 +41,7 @@ api.interceptors.response.use(
           if (newRefresh) localStorage.setItem('refreshToken', newRefresh)
           applyTokenExternal(accessToken, newRefresh ?? refreshToken)
           original.headers.Authorization = `Bearer ${accessToken}`
-          return api(original)
+          return await api(original)
         } catch {
           sessionStorage.removeItem('accessToken')
           localStorage.removeItem('refreshToken')

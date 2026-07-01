@@ -44,12 +44,13 @@ export function AuthProvider({ children }) {
   }, [applyToken])
 
   // Platform login — tenantSlug is null
-  const login = useCallback(async (email, password, extraDeviceInfo) => {
+  const login = useCallback(async (email, password, extraDeviceInfo, trustDevice = false) => {
     const deviceInfo = { ...await buildDeviceInfo(), ...extraDeviceInfo }
     const res = await api.post('/auth/login', {
       tenantSlug: null,
       email,
       password,
+      trustDevice,
       ...deviceInfo,
     })
     const { accessToken: token, refreshToken, result, requiresMfa, userId, isPlatformUser } = res.data
@@ -58,12 +59,13 @@ export function AuthProvider({ children }) {
   }, [applyToken])
 
   // Tenant login — tenantSlug provided
-  const loginWithTenant = useCallback(async (email, password, tenantSlug, extraDeviceInfo) => {
+  const loginWithTenant = useCallback(async (email, password, tenantSlug, extraDeviceInfo, trustDevice = false) => {
     const deviceInfo = { ...await buildDeviceInfo(), ...extraDeviceInfo }
     const res = await api.post('/auth/login', {
       tenantSlug,
       email,
       password,
+      trustDevice,
       ...deviceInfo,
     })
     const { accessToken: token, refreshToken, result, requiresMfa, userId } = res.data
@@ -102,6 +104,7 @@ export function AuthProvider({ children }) {
     const permissions = claims?.permissions ?? []
     const isPlatformUser = platformRoles.length > 0
     const hasTenantContext = !!tenantId
+    const deviceId = claims?.deviceId ?? null
 
     const hasPermission = (code) => isPlatformUser || permissions.includes(code)
 
@@ -115,6 +118,7 @@ export function AuthProvider({ children }) {
       isAuthenticated,
       isPlatformUser,
       hasTenantContext,
+      deviceId,
       hasPermission,
       login,
       loginWithTenant,

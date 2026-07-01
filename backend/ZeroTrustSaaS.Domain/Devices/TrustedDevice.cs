@@ -108,6 +108,17 @@ public sealed class TrustedDevice : AuditableEntity
         return Result.Success();
     }
 
+    public Result Unblock()
+    {
+        if (!IsBlocked)
+            return Result.Failure(
+                TrustedDeviceErrors.NotBlocked);
+
+        Status = DeviceStatus.Pending;
+
+        return Result.Success();
+    }
+
     public Result Revoke(DateTime revokedAtUtc)
     {
         if (IsRevoked)

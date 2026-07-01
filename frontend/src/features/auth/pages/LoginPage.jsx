@@ -98,7 +98,7 @@ export default function LoginPage() {
     setError(null)
     try {
       const deviceInfo = await buildDeviceInfo()
-      const result = await login(data.email, data.password, deviceInfo)
+      const result = await login(data.email, data.password, deviceInfo, trustDevice)
       if (result.result === 'InvalidCredentials') {
         setError({ response: { data: { title: 'Invalid credentials', detail: 'The email or password you entered is incorrect.' } } })
         return
@@ -142,7 +142,7 @@ export default function LoginPage() {
     try {
       const deviceInfo = await buildDeviceInfo()
       const result = await loginWithTenant(
-        savedCreds.email, savedCreds.password, data.tenantSlug.trim(), deviceInfo
+        savedCreds.email, savedCreds.password, data.tenantSlug.trim(), deviceInfo, trustDevice
       )
       if (result.result === 'InvalidCredentials') {
         setError({ response: { data: { title: 'Invalid credentials', detail: 'The email, password, or organization slug is incorrect.' } } })
@@ -250,11 +250,22 @@ export default function LoginPage() {
                         ),
                       }}
                     />
-                    <FormControlLabel
-                      control={<Checkbox size="small" {...credForm.register('rememberMe')} />}
-                      label={<Typography variant="body2">Remember me</Typography>}
-                      sx={{ mt: -0.5 }}
-                    />
+                    <Box sx={{ display: 'flex', flexDirection: 'column', mt: -0.5 }}>
+                      <FormControlLabel
+                        control={<Checkbox size="small" {...credForm.register('rememberMe')} />}
+                        label={<Typography variant="body2">Remember me</Typography>}
+                      />
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            size="small"
+                            checked={trustDevice}
+                            onChange={(e) => setTrustDevice(e.target.checked)}
+                          />
+                        }
+                        label={<Typography variant="body2">Trust this device</Typography>}
+                      />
+                    </Box>
                     <Button
                       type="submit"
                       variant="contained"
