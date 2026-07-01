@@ -22,8 +22,10 @@ public sealed class GetDevicesQueryHandler(ITrustedDeviceRepository deviceReposi
                 d.ClientInfo.Country,
                 d.ClientInfo.Browser,
                 d.ClientInfo.OperatingSystem,
+                d.CreatedAtUtc,
                 d.TrustedAtUtc,
                 d.LastSeenAtUtc,
+                d.LastLoginAtUtc,
                 d.RevokedAtUtc))
             .ToList();
 

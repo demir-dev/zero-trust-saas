@@ -34,7 +34,8 @@ internal static class AuthEndpoints
                 request.DeviceFingerprint,
                 request.Country,
                 request.Browser,
-                request.OperatingSystem);
+                request.OperatingSystem,
+                request.TrustDevice);
 
             var result = await handler.Handle(command, ct);
 
@@ -164,7 +165,8 @@ internal sealed record LoginRequest(
     string DeviceFingerprint,
     string Country,
     string Browser,
-    string OperatingSystem);
+    string OperatingSystem,
+    bool TrustDevice = false);
 
 internal sealed record RefreshRequest(
     string RefreshToken,

@@ -20,6 +20,7 @@ public sealed class RefreshTokenCommandHandler(
     ITokenGenerator tokenGenerator,
     ITenantStatusCache tenantStatusCache,
     ISessionStatusCache sessionStatusCache,
+    IDeviceStatusCache deviceStatusCache,
     IDateTimeProvider dateTimeProvider,
     IUnitOfWork unitOfWork)
 {
@@ -78,6 +79,15 @@ public sealed class RefreshTokenCommandHandler(
 
         if (activeUser is null || !activeUser.CanAuthenticate)
             return Result<RefreshTokenResponse>.Failure(UserErrors.LoginNotAllowed);
+
+        // Refuse refresh if the token's device is blocked or revoked.
+        if (existingToken.TrustedDeviceId.HasValue)
+        {
+            var deviceStatus = await deviceStatusCache.GetStatusAsync(
+                existingToken.TrustedDeviceId.Value, cancellationToken);
+            if (deviceStatus is Domain.Devices.DeviceStatus.Blocked or Domain.Devices.DeviceStatus.Revoked)
+                return Result<RefreshTokenResponse>.Failure(Domain.Devices.Errors.TrustedDeviceErrors.DeviceBlocked);
+        }
 
         // Re-issue with same tenant context (null = platform, set = tenant).
         var tenantId = existingToken.TenantId;

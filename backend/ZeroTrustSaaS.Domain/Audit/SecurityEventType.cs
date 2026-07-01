@@ -32,4 +32,5 @@ public enum SecurityEventType
     PasswordResetForced = 28,
     MfaFailed = 29,
     MfaSucceeded = 30,
+    TrustedDeviceUnblocked = 31,
 }

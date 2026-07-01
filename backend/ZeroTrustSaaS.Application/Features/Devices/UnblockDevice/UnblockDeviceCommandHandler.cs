@@ -6,19 +6,17 @@ using ZeroTrustSaaS.Domain.Common;
 using ZeroTrustSaaS.Domain.Devices.Errors;
 using ZeroTrustSaaS.Domain.Security;
 
-namespace ZeroTrustSaaS.Application.Features.Devices.RevokeDevice;
+namespace ZeroTrustSaaS.Application.Features.Devices.UnblockDevice;
 
-public sealed class RevokeDeviceCommandHandler(
+public sealed class UnblockDeviceCommandHandler(
     ITrustedDeviceRepository deviceRepository,
-    IUserRepository userRepository,
     IAuditLogRepository auditLogRepository,
-    ISessionStatusCache sessionStatusCache,
     IDeviceStatusCache deviceStatusCache,
     IDateTimeProvider dateTimeProvider,
     IUnitOfWork unitOfWork)
 {
     public async Task<Result> Handle(
-        RevokeDeviceCommand command,
+        UnblockDeviceCommand command,
         CancellationToken cancellationToken = default)
     {
         var device = await deviceRepository.GetByIdAsync(command.DeviceId, cancellationToken);
@@ -26,32 +24,17 @@ public sealed class RevokeDeviceCommandHandler(
         if (device is null)
             return Result.Failure(TrustedDeviceErrors.NotFound);
 
-        var now = dateTimeProvider.UtcNow;
-        var result = device.Revoke(now);
+        var result = device.Unblock();
 
         if (result.IsFailure)
             return result;
 
         deviceRepository.Update(device);
 
-        // Revoke only sessions belonging to this device; leave other devices' sessions alive.
-        var user = await userRepository.GetByIdWithTokensAsync(device.UserId, cancellationToken);
-        if (user is not null)
-        {
-            var deviceSessions = user.RefreshTokens
-                .Where(rt => rt.TrustedDeviceId == device.Id && rt.IsActive)
-                .ToList();
-
-            foreach (var session in deviceSessions)
-                user.RevokeRefreshToken(session.Id, now);
-
-            if (deviceSessions.Count > 0)
-                userRepository.Update(user);
-        }
-
+        var now = dateTimeProvider.UtcNow;
         var logResult = AuditLog.Create(
-            SecurityEventType.TrustedDeviceRevoked,
-            AuditSeverity.Warning,
+            SecurityEventType.TrustedDeviceUnblocked,
+            AuditSeverity.Info,
             now,
             userId: device.UserId,
             tenantId: null);
@@ -60,13 +43,6 @@ public sealed class RevokeDeviceCommandHandler(
             await auditLogRepository.AddAsync(logResult.Value, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-
-        if (user is not null)
-        {
-            foreach (var session in user.RefreshTokens.Where(rt => rt.TrustedDeviceId == device.Id))
-                sessionStatusCache.Invalidate(session.Id);
-        }
-
         deviceStatusCache.Invalidate(device.Id);
 
         return Result.Success();

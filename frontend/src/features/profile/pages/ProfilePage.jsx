@@ -12,13 +12,16 @@ import {
   Devices as DevicesIcon,
   Block as BlockIcon,
   RemoveCircle as RevokeIcon,
+  VerifiedUser as VerifiedIcon,
+  LockOpen as UnblockIcon,
   ArrowBack as BackIcon,
   Computer, Language, LocationOn,
   ContentCopy as CopyIcon,
   Check as CheckIcon,
   QrCode2 as QrCodeIcon,
-  VerifiedUser as VerifiedIcon,
   Key as KeyIcon,
+  AccessTime as TimeIcon,
+  StarBorder as CurrentIcon,
 } from '@mui/icons-material'
 import { QRCodeSVG } from 'qrcode.react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -403,15 +406,34 @@ function MfaSection({ me, loading }) {
 
 function DevicesSection() {
   const queryClient = useQueryClient()
+  const { deviceId: currentDeviceId } = useAuth()
   const { data: devices, isLoading } = useDevices()
+  const [confirmBlock, setConfirmBlock] = useState(null)
+  const [confirmRevoke, setConfirmRevoke] = useState(null)
 
   const revokeMutation = useMutation({
     mutationFn: (id) => api.post(`/devices/${id}/revoke`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['profile', 'devices'] }),
+    onSuccess: () => {
+      setConfirmRevoke(null)
+      queryClient.invalidateQueries({ queryKey: ['profile', 'devices'] })
+    },
   })
 
   const blockMutation = useMutation({
     mutationFn: (id) => api.post(`/devices/${id}/block`),
+    onSuccess: () => {
+      setConfirmBlock(null)
+      queryClient.invalidateQueries({ queryKey: ['profile', 'devices'] })
+    },
+  })
+
+  const trustMutation = useMutation({
+    mutationFn: (id) => api.post(`/devices/${id}/trust`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['profile', 'devices'] }),
+  })
+
+  const unblockMutation = useMutation({
+    mutationFn: (id) => api.post(`/devices/${id}/unblock`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['profile', 'devices'] }),
   })
 
@@ -431,54 +453,124 @@ function DevicesSection() {
           </Typography>
         ) : (
           <Stack spacing={1}>
-            {devices.map((d) => (
-              <Box
-                key={d.id}
-                sx={{
-                  display: 'flex', alignItems: 'center', gap: 2,
-                  px: 2, py: 1.5,
-                  bgcolor: 'rgba(148,163,184,0.04)',
-                  borderRadius: 2,
-                  border: '1px solid',
-                  borderColor: d.status === 'Trusted' ? 'rgba(34,197,94,0.15)' : d.status === 'Blocked' ? 'rgba(239,68,68,0.15)' : 'divider',
-                }}
-              >
-                <Computer sx={{ color: 'text.secondary', flexShrink: 0 }} />
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body2" fontWeight={600} noWrap>{d.name}</Typography>
-                  <Box sx={{ display: 'flex', gap: 1.5, mt: 0.25, flexWrap: 'wrap' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
-                      <Language sx={{ fontSize: 12, color: 'text.disabled' }} />
-                      <Typography variant="caption" color="text.disabled" sx={{ fontFamily: 'monospace' }}>{d.ipAddress}</Typography>
+            {devices.map((d) => {
+              const isCurrent = currentDeviceId && d.id === currentDeviceId
+              return (
+                <Box
+                  key={d.id}
+                  sx={{
+                    display: 'flex', alignItems: 'flex-start', gap: 2,
+                    px: 2, py: 1.5,
+                    bgcolor: 'rgba(148,163,184,0.04)',
+                    borderRadius: 2,
+                    border: '1px solid',
+                    borderColor: isCurrent
+                      ? 'primary.main'
+                      : d.status === 'Trusted' ? 'rgba(34,197,94,0.15)'
+                      : d.status === 'Blocked' ? 'rgba(239,68,68,0.15)'
+                      : 'divider',
+                  }}
+                >
+                  <Computer sx={{ color: 'text.secondary', flexShrink: 0, mt: 0.25 }} />
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap', mb: 0.25 }}>
+                      <Typography variant="body2" fontWeight={600} noWrap>{d.name}</Typography>
+                      {isCurrent && (
+                        <Chip
+                          icon={<CurrentIcon sx={{ fontSize: '12px !important' }} />}
+                          label="This device"
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                          sx={{ height: 18, fontSize: '0.6rem' }}
+                        />
+                      )}
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
-                      <LocationOn sx={{ fontSize: 12, color: 'text.disabled' }} />
-                      <Typography variant="caption" color="text.disabled">{d.country}</Typography>
-                    </Box>
+                    <Stack spacing={0.2}>
+                      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
+                          <Language sx={{ fontSize: 11, color: 'text.disabled' }} />
+                          <Typography variant="caption" color="text.disabled" sx={{ fontFamily: 'monospace' }}>{d.ipAddress}</Typography>
+                        </Box>
+                        {d.country && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
+                            <LocationOn sx={{ fontSize: 11, color: 'text.disabled' }} />
+                            <Typography variant="caption" color="text.disabled">{d.country}</Typography>
+                          </Box>
+                        )}
+                      </Box>
+                      {d.lastSeenAtUtc && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
+                          <TimeIcon sx={{ fontSize: 11, color: 'text.disabled' }} />
+                          <Typography variant="caption" color="text.disabled">
+                            Last seen {new Date(d.lastSeenAtUtc).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                          </Typography>
+                        </Box>
+                      )}
+                      {d.lastLoginAtUtc && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
+                          <TimeIcon sx={{ fontSize: 11, color: 'text.disabled' }} />
+                          <Typography variant="caption" color="text.disabled">
+                            Last login {new Date(d.lastLoginAtUtc).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Stack>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+                    <StatusChip status={d.status} />
+                    {d.status === 'Pending' && (
+                      <Tooltip title="Trust device">
+                        <IconButton size="small" color="success" onClick={() => trustMutation.mutate(d.id)} disabled={trustMutation.isPending}>
+                          <VerifiedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {d.status === 'Blocked' && (
+                      <Tooltip title="Unblock device">
+                        <IconButton size="small" color="info" onClick={() => unblockMutation.mutate(d.id)} disabled={unblockMutation.isPending}>
+                          <UnblockIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {d.status !== 'Revoked' && (
+                      <Tooltip title="Revoke">
+                        <IconButton size="small" color="warning" onClick={() => setConfirmRevoke(d.id)}>
+                          <RevokeIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {d.status !== 'Blocked' && d.status !== 'Revoked' && (
+                      <Tooltip title="Block">
+                        <IconButton size="small" color="error" onClick={() => setConfirmBlock(d.id)}>
+                          <BlockIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                   </Box>
                 </Box>
-                <StatusChip status={d.status} />
-                <Box sx={{ display: 'flex', gap: 0.5 }}>
-                  {d.status !== 'Revoked' && (
-                    <Tooltip title="Revoke">
-                      <IconButton size="small" color="warning" onClick={() => revokeMutation.mutate(d.id)}>
-                        <RevokeIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                  {d.status !== 'Blocked' && d.status !== 'Revoked' && (
-                    <Tooltip title="Block">
-                      <IconButton size="small" color="error" onClick={() => blockMutation.mutate(d.id)}>
-                        <BlockIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                </Box>
-              </Box>
-            ))}
+              )
+            })}
           </Stack>
         )}
       </CardContent>
+
+      <ConfirmDialog
+        open={!!confirmBlock}
+        title="Block device?"
+        message="The device will be blocked immediately. Any active sessions on this device will be terminated."
+        onConfirm={() => blockMutation.mutate(confirmBlock)}
+        onCancel={() => setConfirmBlock(null)}
+        confirmColor="error"
+      />
+      <ConfirmDialog
+        open={!!confirmRevoke}
+        title="Revoke device?"
+        message="The device will be revoked. Active sessions on this device will be terminated."
+        onConfirm={() => revokeMutation.mutate(confirmRevoke)}
+        onCancel={() => setConfirmRevoke(null)}
+        confirmColor="warning"
+      />
     </Card>
   )
 }

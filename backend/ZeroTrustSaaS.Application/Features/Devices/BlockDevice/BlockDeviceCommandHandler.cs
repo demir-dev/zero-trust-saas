@@ -1,14 +1,17 @@
 using ZeroTrustSaaS.Application.Abstractions.Persistence;
 using ZeroTrustSaaS.Application.Abstractions.Repositories;
 using ZeroTrustSaaS.Application.Abstractions.Services;
+using ZeroTrustSaaS.Domain.Audit;
 using ZeroTrustSaaS.Domain.Common;
 using ZeroTrustSaaS.Domain.Devices.Errors;
+using ZeroTrustSaaS.Domain.Security;
 
 namespace ZeroTrustSaaS.Application.Features.Devices.BlockDevice;
 
 public sealed class BlockDeviceCommandHandler(
     ITrustedDeviceRepository deviceRepository,
     IUserRepository userRepository,
+    IAuditLogRepository auditLogRepository,
     IDateTimeProvider dateTimeProvider,
     ISessionStatusCache sessionStatusCache,
     IDeviceStatusCache deviceStatusCache,
@@ -47,17 +50,23 @@ public sealed class BlockDeviceCommandHandler(
                 userRepository.Update(user);
         }
 
+        var logResult = AuditLog.Create(
+            SecurityEventType.TrustedDeviceBlocked,
+            AuditSeverity.Warning,
+            now,
+            userId: device.UserId,
+            tenantId: null);
+
+        if (logResult.IsSuccess)
+            await auditLogRepository.AddAsync(logResult.Value, cancellationToken);
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // Invalidate each revoked session and the device status so in-flight JWTs are rejected.
+        // Invalidate each revoked session and the device status so in-flight JWTs are rejected immediately.
         if (user is not null)
         {
-            var revokedIds = user.RefreshTokens
-                .Where(rt => rt.TrustedDeviceId == device.Id)
-                .Select(rt => rt.Id);
-
-            foreach (var sessionId in revokedIds)
-                sessionStatusCache.Invalidate(sessionId);
+            foreach (var session in user.RefreshTokens.Where(rt => rt.TrustedDeviceId == device.Id))
+                sessionStatusCache.Invalidate(session.Id);
         }
 
         deviceStatusCache.Invalidate(device.Id);

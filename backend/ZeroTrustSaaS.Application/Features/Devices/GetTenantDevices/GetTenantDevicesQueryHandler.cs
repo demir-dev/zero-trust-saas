@@ -28,8 +28,10 @@ public sealed class GetTenantDevicesQueryHandler(ITrustedDeviceRepository device
                 d.ClientInfo.Country,
                 d.ClientInfo.Browser,
                 d.ClientInfo.OperatingSystem,
+                d.CreatedAtUtc,
                 d.TrustedAtUtc,
                 d.LastSeenAtUtc,
+                d.LastLoginAtUtc,
                 d.RevokedAtUtc))
             .ToList();
 

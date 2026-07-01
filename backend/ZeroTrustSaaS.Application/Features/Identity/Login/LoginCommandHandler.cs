@@ -116,6 +116,8 @@ public sealed class LoginCommandHandler(
                     return Result<LoginResponse>.Failure(TrustedDeviceErrors.DeviceBlocked);
 
                 existing.RecordLogin(now);
+                if (command.TrustDevice && existing.IsPending)
+                    existing.Trust(now);
                 trustedDeviceRepository.Update(existing);
                 deviceId = existing.Id;
             }
@@ -129,8 +131,7 @@ public sealed class LoginCommandHandler(
                     if (newDeviceResult.IsSuccess)
                     {
                         var newDevice = newDeviceResult.Value;
-                        // No MFA path: auto-trust the new device immediately.
-                        if (!user.IsMfaEnabled)
+                        if (command.TrustDevice)
                             newDevice.Trust(now);
                         await trustedDeviceRepository.AddAsync(newDevice, cancellationToken);
                         deviceId = newDevice.Id;

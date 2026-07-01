@@ -28,4 +28,9 @@ public static class TrustedDeviceErrors
         Error.Forbidden(
             "Devices.TrustedDevice.DeviceBlocked",
             "This device has been blocked and cannot be used to sign in.");
+
+    public static readonly Error NotBlocked =
+        Error.Conflict(
+            "Devices.TrustedDevice.NotBlocked",
+            "The device is not currently blocked.");
 }

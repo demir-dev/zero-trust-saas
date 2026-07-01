@@ -10,6 +10,8 @@ public sealed record DeviceDto(
     string? Country,
     string? Browser,
     string? OperatingSystem,
+    DateTime CreatedAtUtc,
     DateTime? TrustedAtUtc,
     DateTime? LastSeenAtUtc,
+    DateTime? LastLoginAtUtc,
     DateTime? RevokedAtUtc);
