@@ -1,3 +1,5 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -38,6 +40,40 @@ builder.Services
             ValidAudience = jwtSettings.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var userIdClaim = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                var stampClaim  = context.Principal?.FindFirstValue("security_stamp");
+
+                if (userIdClaim is null || stampClaim is null
+                    || !Guid.TryParse(userIdClaim, out var userId))
+                    return;
+
+                var stampCache = context.HttpContext.RequestServices
+                    .GetRequiredService<ISecurityStampCache>();
+
+                var currentStamp = await stampCache.GetOrFetchStampAsync(
+                    userId, context.HttpContext.RequestAborted);
+
+                if (currentStamp is null || currentStamp != stampClaim)
+                {
+                    context.Fail("Security stamp mismatch.");
+                    return;
+                }
+
+                var tenantIdClaim = context.Principal?.FindFirstValue("tenant_id");
+                if (tenantIdClaim is not null && Guid.TryParse(tenantIdClaim, out var tenantId))
+                {
+                    var tenantStatusCache = context.HttpContext.RequestServices
+                        .GetRequiredService<ITenantStatusCache>();
+                    if (!await tenantStatusCache.IsActiveAsync(tenantId, context.HttpContext.RequestAborted))
+                        context.Fail("Tenant is suspended.");
+                }
+            }
         };
     });
 

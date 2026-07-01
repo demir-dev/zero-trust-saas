@@ -7,4 +7,5 @@ public sealed record LoginResponse(
     string? RefreshToken,
     LoginResult Result,
     bool RequiresMfa,
-    Guid UserId);
+    Guid UserId,
+    bool IsPlatformUser = false);

@@ -23,6 +23,25 @@ public sealed class RevokeUserRoleCommandHandler(
     {
         var permCheck = currentUser.RequirePermission(WellKnownPermissions.RoleManage);
         if (permCheck.IsFailure) return permCheck;
+
+        if (!currentUser.IsPlatformUser)
+        {
+            var targetRolesForHierarchy = await roleRepository.GetUserRolesAsync(
+                command.UserId, command.TenantId, cancellationToken);
+            var targetLevel = 0;
+            foreach (var ur in targetRolesForHierarchy.Where(r => r.IsActive))
+            {
+                var role = await roleRepository.GetByIdAsync(ur.RoleId, cancellationToken);
+                if (role is not null)
+                {
+                    var lvl = WellKnownPermissions.GetRoleLevel(role.Name.Value);
+                    if (lvl > targetLevel) targetLevel = lvl;
+                }
+            }
+            if (currentUser.GetTenantRoleLevel() <= targetLevel)
+                return Result.Failure(AuthorizationErrors.InsufficientHierarchyLevel);
+        }
+
         var user = await userRepository.GetByIdAsync(command.UserId, cancellationToken);
         if (user is null)
             return Result.Failure(UserErrors.NotFound);

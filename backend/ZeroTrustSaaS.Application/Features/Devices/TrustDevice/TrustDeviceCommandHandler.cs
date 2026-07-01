@@ -47,6 +47,37 @@ public sealed class TrustDeviceCommandHandler(
         if (clientInfoResult.IsFailure)
             return Result<Guid>.Failure(clientInfoResult.Error);
 
+        var now = dateTimeProvider.UtcNow;
+
+        // Dedup: if a non-revoked device with the same fingerprint already exists, trust it.
+        var existingDevice = await trustedDeviceRepository
+            .GetByFingerprintAsync(command.UserId, fingerprintResult.Value.Value, cancellationToken);
+
+        if (existingDevice is not null && !existingDevice.IsRevoked)
+        {
+            if (!existingDevice.IsTrusted)
+            {
+                var reTrustResult = existingDevice.Trust(now);
+                if (reTrustResult.IsFailure)
+                    return Result<Guid>.Failure(reTrustResult.Error);
+                trustedDeviceRepository.Update(existingDevice);
+            }
+
+            var existingLogResult = AuditLog.Create(
+                SecurityEventType.TrustedDeviceAdded,
+                AuditSeverity.Info,
+                now,
+                userId: command.UserId,
+                tenantId: null,
+                ipAddress: ipResult.IsSuccess ? ipResult.Value : null);
+
+            if (existingLogResult.IsSuccess)
+                await auditLogRepository.AddAsync(existingLogResult.Value, cancellationToken);
+
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return Result<Guid>.Success(existingDevice.Id);
+        }
+
         var deviceResult = TrustedDevice.Register(
             command.UserId,
             nameResult.Value,
@@ -56,8 +87,6 @@ public sealed class TrustDeviceCommandHandler(
             return Result<Guid>.Failure(deviceResult.Error);
 
         var device = deviceResult.Value;
-
-        var now = dateTimeProvider.UtcNow;
         device.Trust(now);
 
         await trustedDeviceRepository.AddAsync(device, cancellationToken);

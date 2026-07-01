@@ -1,4 +1,6 @@
 import axios from 'axios'
+import { buildDeviceInfo } from '../utils/deviceInfo'
+import { applyTokenExternal } from '../../features/auth/store/authStore'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '/api'
 
@@ -29,26 +31,24 @@ api.interceptors.response.use(
       const refreshToken = localStorage.getItem('refreshToken')
       if (refreshToken) {
         try {
-          const deviceFingerprint = navigator.userAgent.substring(0, 50)
+          const deviceInfo = await buildDeviceInfo()
           const res = await axios.post(`${BASE_URL}/auth/refresh`, {
             refreshToken,
-            deviceFingerprint,
-            country: 'Unknown',
-            browser: navigator.userAgent.split(' ').slice(-1)[0] || 'Unknown',
-            operatingSystem: navigator.platform || 'Unknown',
+            ...deviceInfo,
           })
           const { accessToken, refreshToken: newRefresh } = res.data
           sessionStorage.setItem('accessToken', accessToken)
           if (newRefresh) localStorage.setItem('refreshToken', newRefresh)
+          applyTokenExternal(accessToken, newRefresh ?? refreshToken)
           original.headers.Authorization = `Bearer ${accessToken}`
           return api(original)
         } catch {
           sessionStorage.removeItem('accessToken')
           localStorage.removeItem('refreshToken')
-          window.location.href = '/login'
+          window.location.href = '/login?reason=expired'
         }
       } else {
-        window.location.href = '/login'
+        window.location.href = '/login?reason=expired'
       }
     }
     return Promise.reject(error)

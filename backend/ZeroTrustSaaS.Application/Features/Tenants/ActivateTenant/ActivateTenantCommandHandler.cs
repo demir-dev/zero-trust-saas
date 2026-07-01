@@ -8,6 +8,7 @@ namespace ZeroTrustSaaS.Application.Features.Tenants.ActivateTenant;
 
 public sealed class ActivateTenantCommandHandler(
     ITenantRepository tenantRepository,
+    ITenantStatusCache tenantStatusCache,
     IDateTimeProvider dateTimeProvider,
     IUnitOfWork unitOfWork)
 {
@@ -26,6 +27,7 @@ public sealed class ActivateTenantCommandHandler(
 
         tenantRepository.Update(tenant);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        tenantStatusCache.Invalidate(command.TenantId);
 
         return Result.Success();
     }

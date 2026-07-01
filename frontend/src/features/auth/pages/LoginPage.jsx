@@ -15,6 +15,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuth } from '../store/authStore'
+import { buildDeviceInfo } from '../../../shared/utils/deviceInfo'
 import ProblemAlert from '../../../shared/components/ProblemAlert'
 
 const credSchema = z.object({
@@ -47,12 +48,14 @@ export default function LoginPage() {
   const [useRecovery, setUseRecovery] = useState(false)
 
   const initMessage = location.state?.message
+  const sessionExpired = new URLSearchParams(location.search).get('reason') === 'expired'
 
   const onMfaSubmit = async () => {
     if (!mfaCode.trim() || !mfaPending) return
     setLoading(true)
     setError(null)
     try {
+      const deviceInfo = await buildDeviceInfo()
       const result = await verifyMfa(
         mfaPending.userId,
         mfaPending.tenantSlug,
@@ -88,27 +91,27 @@ export default function LoginPage() {
     defaultValues: { tenantSlug: '' },
   })
 
-  const deviceInfo = {
-    deviceFingerprint: navigator.userAgent.substring(0, 50),
-    country: 'Unknown',
-    browser: navigator.userAgent.split(' ').slice(-1)[0] || 'Unknown',
-    operatingSystem: navigator.platform || 'Unknown',
-  }
-
   const onCredentialsSubmit = async (data) => {
     setLoading(true)
     setError(null)
     try {
+      const deviceInfo = await buildDeviceInfo()
       const result = await login(data.email, data.password, deviceInfo)
       if (result.result === 'InvalidCredentials') {
         setError({ response: { data: { title: 'Invalid credentials', detail: 'The email or password you entered is incorrect.' } } })
         return
       }
       if (result.requiresMfa) {
-        setMfaPending({ userId: result.userId, tenantSlug: null })
-        setMfaCode('')
-        setUseRecovery(false)
-        setPhase(2)
+        if (result.isPlatformUser) {
+          setMfaPending({ userId: result.userId, tenantSlug: null })
+          setMfaCode('')
+          setUseRecovery(false)
+          setPhase(2)
+        } else {
+          setSavedCreds({ email: data.email, password: data.password })
+          setMfaPending(null)
+          setPhase(1)
+        }
         return
       }
       const { isPlatformUser, hasTenantContext } = window.__authContextRef ?? {}
@@ -135,6 +138,7 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
     try {
+      const deviceInfo = await buildDeviceInfo()
       const result = await loginWithTenant(
         savedCreds.email, savedCreds.password, data.tenantSlug.trim(), deviceInfo
       )
@@ -187,6 +191,9 @@ export default function LoginPage() {
 
         <Card>
           <CardContent sx={{ p: 3 }}>
+            {sessionExpired && (
+              <Alert severity="warning" sx={{ mb: 2 }}>Your session has expired. Please sign in again.</Alert>
+            )}
             {initMessage && (
               <Alert severity="success" sx={{ mb: 2 }}>{initMessage}</Alert>
             )}

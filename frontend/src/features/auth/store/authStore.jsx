@@ -1,16 +1,14 @@
-import { createContext, useContext, useState, useCallback, useMemo } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react'
 import api from '../../../shared/api/axiosInstance'
 import { parseJwtClaims } from '../../../shared/utils/jwt'
+import { buildDeviceInfo } from '../../../shared/utils/deviceInfo'
 
 const AuthContext = createContext(null)
 
-function buildDeviceInfo() {
-  return {
-    deviceFingerprint: navigator.userAgent.substring(0, 50),
-    country: 'Unknown',
-    browser: navigator.userAgent.split(' ').slice(-1)[0] || 'Unknown',
-    operatingSystem: navigator.platform || 'Unknown',
-  }
+let _applyTokenExternal = null
+export function _registerExternalApplyToken(fn) { _applyTokenExternal = fn }
+export function applyTokenExternal(token, refresh) {
+  if (_applyTokenExternal) _applyTokenExternal(token, refresh)
 }
 
 function storeTokens(accessToken, refreshToken) {
@@ -40,23 +38,28 @@ export function AuthProvider({ children }) {
     setClaims(token ? parseJwtClaims(token) : null)
   }, [])
 
+  useEffect(() => {
+    _registerExternalApplyToken(applyToken)
+    return () => _registerExternalApplyToken(null)
+  }, [applyToken])
+
   // Platform login — tenantSlug is null
   const login = useCallback(async (email, password, extraDeviceInfo) => {
-    const deviceInfo = { ...buildDeviceInfo(), ...extraDeviceInfo }
+    const deviceInfo = { ...await buildDeviceInfo(), ...extraDeviceInfo }
     const res = await api.post('/auth/login', {
       tenantSlug: null,
       email,
       password,
       ...deviceInfo,
     })
-    const { accessToken: token, refreshToken, result, requiresMfa, userId } = res.data
+    const { accessToken: token, refreshToken, result, requiresMfa, userId, isPlatformUser } = res.data
     if (token) applyToken(token, refreshToken)
-    return { result, requiresMfa, userId, accessToken: token }
+    return { result, requiresMfa, userId, accessToken: token, isPlatformUser: isPlatformUser ?? false }
   }, [applyToken])
 
   // Tenant login — tenantSlug provided
   const loginWithTenant = useCallback(async (email, password, tenantSlug, extraDeviceInfo) => {
-    const deviceInfo = { ...buildDeviceInfo(), ...extraDeviceInfo }
+    const deviceInfo = { ...await buildDeviceInfo(), ...extraDeviceInfo }
     const res = await api.post('/auth/login', {
       tenantSlug,
       email,
@@ -69,7 +72,7 @@ export function AuthProvider({ children }) {
   }, [applyToken])
 
   const verifyMfa = useCallback(async (userId, tenantSlug, code, isRecoveryCode, extraDeviceInfo) => {
-    const deviceInfo = { ...buildDeviceInfo(), ...extraDeviceInfo }
+    const deviceInfo = { ...await buildDeviceInfo(), ...extraDeviceInfo }
     const res = await api.post('/auth/mfa/verify', {
       userId,
       tenantSlug: tenantSlug ?? null,

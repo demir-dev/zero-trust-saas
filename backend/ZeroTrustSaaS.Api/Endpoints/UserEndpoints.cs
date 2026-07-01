@@ -1,15 +1,19 @@
 using ZeroTrustSaaS.Api.Helpers;
 using ZeroTrustSaaS.Application.Abstractions.Services;
+using ZeroTrustSaaS.Application.Features.Audit.GetAuditLogs;
 using ZeroTrustSaaS.Application.Features.Authorization.AssignRole;
 using ZeroTrustSaaS.Application.Features.Authorization.RevokeUserRole;
+using ZeroTrustSaaS.Application.Features.Devices.GetDevices;
 using ZeroTrustSaaS.Application.Features.Identity.ActivateUser;
 using ZeroTrustSaaS.Application.Features.Identity.CreateTenantUser;
 using ZeroTrustSaaS.Application.Features.Identity.ForcePasswordReset;
 using ZeroTrustSaaS.Application.Features.Identity.GetCurrentUser;
 using ZeroTrustSaaS.Application.Features.Identity.GetUserDetails;
+using ZeroTrustSaaS.Application.Features.Identity.GetUserSessions;
 using ZeroTrustSaaS.Application.Features.Identity.GetUsers;
 using ZeroTrustSaaS.Application.Features.Identity.LockUser;
 using ZeroTrustSaaS.Application.Features.Identity.Mfa;
+using ZeroTrustSaaS.Application.Features.Identity.RevokeUserSession;
 using ZeroTrustSaaS.Application.Features.Identity.RevokeUserSessions;
 using ZeroTrustSaaS.Application.Features.Identity.SuspendUser;
 using ZeroTrustSaaS.Application.Features.Identity.UnlockUser;
@@ -216,6 +220,64 @@ internal static class UserEndpoints
 
             return result.IsSuccess
                 ? Results.NoContent()
+                : ApiErrors.Problem(result.Error);
+        });
+
+        group.MapGet("/{id:guid}/sessions", async (
+            Guid id,
+            ICurrentUserContext currentUser,
+            GetUserSessionsQueryHandler handler,
+            CancellationToken ct) =>
+        {
+            var query = new GetUserSessionsQuery(id, currentUser.TenantId);
+            var result = await handler.Handle(query, ct);
+
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : ApiErrors.Problem(result.Error);
+        });
+
+        group.MapPost("/{id:guid}/sessions/{sid:guid}/revoke", async (
+            Guid id,
+            Guid sid,
+            ICurrentUserContext currentUser,
+            RevokeUserSessionCommandHandler handler,
+            CancellationToken ct) =>
+        {
+            var command = new RevokeUserSessionCommand(id, sid, currentUser.TenantId);
+            var result = await handler.Handle(command, ct);
+
+            return result.IsSuccess
+                ? Results.NoContent()
+                : ApiErrors.Problem(result.Error);
+        });
+
+        group.MapGet("/{id:guid}/devices", async (
+            Guid id,
+            GetDevicesQueryHandler handler,
+            CancellationToken ct) =>
+        {
+            var query = new GetDevicesQuery(id);
+            var result = await handler.Handle(query, ct);
+
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : ApiErrors.Problem(result.Error);
+        });
+
+        group.MapGet("/{id:guid}/audit", async (
+            Guid id,
+            ICurrentUserContext currentUser,
+            GetAuditLogsQueryHandler handler,
+            int page = 1,
+            int pageSize = 20,
+            CancellationToken ct = default) =>
+        {
+            var query = new GetAuditLogsQuery(currentUser.TenantId, id, page, pageSize);
+            var result = await handler.Handle(query, ct);
+
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
                 : ApiErrors.Problem(result.Error);
         });
     }

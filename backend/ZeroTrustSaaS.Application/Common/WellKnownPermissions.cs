@@ -65,4 +65,20 @@ public static class WellKnownPermissions
 
     // Legacy alias kept for callers that used "Member"
     public static readonly IReadOnlyList<string> MemberPermissions = EmployeePermissions;
+
+    public static readonly IReadOnlyDictionary<string, int> RoleLevels =
+        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["PlatformOwner"]         = 100,
+            ["PlatformAdministrator"] = 90,
+            ["PlatformSupport"]       = 80,
+            ["Owner"]                 = 50,
+            ["Administrator"]         = 40,
+            ["Manager"]               = 30,
+            ["Auditor"]               = 20,
+            ["Employee"]              = 10,
+        };
+
+    public static int GetRoleLevel(string roleName) =>
+        RoleLevels.TryGetValue(roleName, out var level) ? level : 0;
 }

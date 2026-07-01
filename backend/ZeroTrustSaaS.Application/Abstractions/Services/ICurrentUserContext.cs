@@ -12,6 +12,8 @@ public interface ICurrentUserContext
 
     IEnumerable<string> Permissions { get; }
 
+    string? TenantRole { get; }
+
     string? IpAddress { get; }
 
     string? UserAgent { get; }
