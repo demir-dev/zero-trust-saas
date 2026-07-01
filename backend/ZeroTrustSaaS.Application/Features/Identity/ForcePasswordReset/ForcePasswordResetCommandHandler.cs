@@ -26,7 +26,7 @@ public sealed class ForcePasswordResetCommandHandler(
     {
         var permCheck = currentUser.RequirePermission(WellKnownPermissions.UserManage);
         if (permCheck.IsFailure) return Result<ForcePasswordResetResponse>.Failure(permCheck.Error);
-        var user = await userRepository.GetByIdAsync(command.UserId, cancellationToken);
+        var user = await userRepository.GetByIdWithTokensAsync(command.UserId, cancellationToken);
 
         if (user is null)
             return Result<ForcePasswordResetResponse>.Failure(UserErrors.NotFound);

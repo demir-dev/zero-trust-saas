@@ -23,7 +23,11 @@ export default function DataTable({
           borderColor: 'divider',
         },
         '& .MuiDataGrid-row:hover': { bgcolor: 'rgba(99,102,241,0.04)' },
-        '& .MuiDataGrid-cell': { borderColor: 'divider' },
+        '& .MuiDataGrid-cell': {
+          borderColor: 'divider',
+          display: 'flex',
+          alignItems: 'center',
+        },
         '& .MuiDataGrid-footerContainer': { borderTop: '1px solid', borderColor: 'divider' },
         ...sx,
       }}

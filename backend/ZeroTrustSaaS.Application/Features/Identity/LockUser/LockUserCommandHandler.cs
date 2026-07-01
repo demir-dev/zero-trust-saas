@@ -20,7 +20,7 @@ public sealed class LockUserCommandHandler(
     {
         var permCheck = currentUser.RequirePermission(WellKnownPermissions.UserManage);
         if (permCheck.IsFailure) return permCheck;
-        var user = await userRepository.GetByIdAsync(command.UserId, cancellationToken);
+        var user = await userRepository.GetByIdWithTokensAsync(command.UserId, cancellationToken);
 
         if (user is null)
             return Result.Failure(UserErrors.NotFound);
