@@ -29,6 +29,7 @@ internal sealed class RefreshTokenRepository(AppDbContext dbContext) : IRefreshT
         return await dbContext.RefreshTokens
             .Where(rt => rt.UserId == userId
                       && rt.RevokedAtUtc == null
+                      && rt.UsedAtUtc == null
                       && rt.ExpiresAtUtc > DateTime.UtcNow)
             .OrderByDescending(rt => rt.IssuedAtUtc)
             .ToListAsync(cancellationToken);
