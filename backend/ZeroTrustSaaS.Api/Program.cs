@@ -47,12 +47,27 @@ builder.Services
         {
             OnTokenValidated = async context =>
             {
+                var log = context.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("ZeroTrustSaaS.Auth.OnTokenValidated");
+
+                var path   = context.HttpContext.Request.Path;
+                var method = context.HttpContext.Request.Method;
+
                 var userIdClaim = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Sub);
                 var stampClaim  = context.Principal?.FindFirstValue("security_stamp");
+                var sessionIdClaim = context.Principal?.FindFirstValue("session_id");
+
+                log.LogInformation(
+                    "[OnTokenValidated] ENTER  {Method} {Path}  user={UserId}  session={SessionId}",
+                    method, path, userIdClaim ?? "(none)", sessionIdClaim ?? "(none)");
 
                 if (userIdClaim is null || stampClaim is null
                     || !Guid.TryParse(userIdClaim, out var userId))
+                {
+                    log.LogWarning("[OnTokenValidated] FAIL missing sub/stamp claims");
                     return;
+                }
 
                 var stampCache = context.HttpContext.RequestServices
                     .GetRequiredService<ISecurityStampCache>();
@@ -62,9 +77,15 @@ builder.Services
 
                 if (currentStamp is null || currentStamp != stampClaim)
                 {
+                    log.LogWarning(
+                        "[OnTokenValidated] REJECT stamp_mismatch  user={UserId}  " +
+                        "jwt_stamp={JwtStamp}  db_stamp={DbStamp}",
+                        userId, stampClaim, currentStamp ?? "(null)");
                     context.Fail("Security stamp mismatch.");
                     return;
                 }
+
+                log.LogDebug("[OnTokenValidated] stamp OK  user={UserId}", userId);
 
                 var tenantIdClaim = context.Principal?.FindFirstValue("tenant_id");
                 if (tenantIdClaim is not null && Guid.TryParse(tenantIdClaim, out var tenantId))
@@ -73,21 +94,31 @@ builder.Services
                         .GetRequiredService<ITenantStatusCache>();
                     if (!await tenantStatusCache.IsActiveAsync(tenantId, context.HttpContext.RequestAborted))
                     {
+                        log.LogWarning("[OnTokenValidated] REJECT tenant_suspended  tenant={TenantId}", tenantId);
                         context.Fail("Tenant is suspended.");
                         return;
                     }
+                    log.LogDebug("[OnTokenValidated] tenant OK  tenant={TenantId}", tenantId);
                 }
 
-                var sessionIdClaim = context.Principal?.FindFirstValue("session_id");
                 if (sessionIdClaim is not null && Guid.TryParse(sessionIdClaim, out var sessionId))
                 {
                     var sessionCache = context.HttpContext.RequestServices
                         .GetRequiredService<ISessionStatusCache>();
-                    if (!await sessionCache.IsActiveAsync(sessionId, context.HttpContext.RequestAborted))
+                    bool active = await sessionCache.IsActiveAsync(sessionId, context.HttpContext.RequestAborted);
+                    log.LogDebug(
+                        "[OnTokenValidated] session check  session={SessionId}  active={Active}",
+                        sessionId, active);
+                    if (!active)
                     {
+                        log.LogWarning("[OnTokenValidated] REJECT session_revoked  session={SessionId}", sessionId);
                         context.Fail("Session has been revoked.");
                         return;
                     }
+                }
+                else
+                {
+                    log.LogDebug("[OnTokenValidated] no session_id claim — skipping session check");
                 }
 
                 var deviceIdClaim = context.Principal?.FindFirstValue("device_id");
@@ -98,10 +129,17 @@ builder.Services
                     var deviceStatus = await deviceCache.GetStatusAsync(deviceId, context.HttpContext.RequestAborted);
                     if (deviceStatus is DeviceStatus.Blocked or DeviceStatus.Revoked)
                     {
+                        log.LogWarning(
+                            "[OnTokenValidated] REJECT device_blocked  device={DeviceId}  status={Status}",
+                            deviceId, deviceStatus);
                         context.Fail("Device is blocked or revoked.");
                         return;
                     }
                 }
+
+                log.LogInformation(
+                    "[OnTokenValidated] PASS  {Method} {Path}  user={UserId}  session={SessionId}",
+                    method, path, userId, sessionIdClaim ?? "(none)");
             }
         };
     });
