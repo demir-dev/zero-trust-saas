@@ -66,6 +66,16 @@ internal sealed class UserRepository(AppDbContext dbContext) : IUserRepository
                 cancellationToken);
     }
 
+    public async Task<string?> GetSecurityStampAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var stamp = await dbContext.Users
+            .Where(u => u.Id == id)
+            .Select(u => (Guid?)u.SecurityStamp.Value)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return stamp?.ToString();
+    }
+
     public Task AddAsync(User user, CancellationToken cancellationToken = default)
     {
         return dbContext.Users.AddAsync(user, cancellationToken).AsTask();

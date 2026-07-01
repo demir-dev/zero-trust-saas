@@ -8,6 +8,7 @@ using ZeroTrustSaaS.Domain.Identity;
 using ZeroTrustSaaS.Domain.Identity.Enums;
 using ZeroTrustSaaS.Domain.Identity.Errors;
 using ZeroTrustSaaS.Domain.Security;
+using ZeroTrustSaaS.Domain.Tenants.Errors;
 
 namespace ZeroTrustSaaS.Application.Features.Identity.RefreshToken;
 
@@ -17,6 +18,7 @@ public sealed class RefreshTokenCommandHandler(
     IRoleRepository roleRepository,
     IAuditLogRepository auditLogRepository,
     ITokenGenerator tokenGenerator,
+    ITenantStatusCache tenantStatusCache,
     IDateTimeProvider dateTimeProvider,
     IUnitOfWork unitOfWork)
 {
@@ -37,7 +39,7 @@ public sealed class RefreshTokenCommandHandler(
         {
             if (existingToken.IsRevoked)
             {
-                var user = await userRepository.GetByIdAsync(existingToken.UserId, cancellationToken);
+                var user = await userRepository.GetByIdWithTokensAsync(existingToken.UserId, cancellationToken);
 
                 if (user is not null)
                 {
@@ -58,6 +60,13 @@ public sealed class RefreshTokenCommandHandler(
 
         if (activeUser is null || !activeUser.CanAuthenticate)
             return Result<RefreshTokenResponse>.Failure(UserErrors.LoginNotAllowed);
+
+        // Re-issue with same tenant context (null = platform, set = tenant).
+        var tenantId = existingToken.TenantId;
+
+        if (tenantId is not null &&
+            !await tenantStatusCache.IsActiveAsync(tenantId.Value, cancellationToken))
+            return Result<RefreshTokenResponse>.Failure(TenantErrors.TenantSuspended);
 
         var ipResult = IpAddress.Create(command.IpAddress);
         var fingerprintResult = DeviceFingerprint.Create(command.DeviceFingerprint);
@@ -85,9 +94,6 @@ public sealed class RefreshTokenCommandHandler(
         var newTokenHashResult = RefreshTokenHash.Create(newHashedToken);
         if (newTokenHashResult.IsFailure)
             return Result<RefreshTokenResponse>.Failure(newTokenHashResult.Error);
-
-        // Re-issue with same tenant context (null = platform, set = tenant).
-        var tenantId = existingToken.TenantId;
 
         var newRefreshTokenResult = Domain.Identity.RefreshToken.Create(
             activeUser.Id,

@@ -18,9 +18,9 @@ internal sealed class TrustedDeviceRepository(AppDbContext dbContext) : ITrusted
         CancellationToken cancellationToken = default)
     {
         return dbContext.TrustedDevices
-            .FirstOrDefaultAsync(
-                td => td.UserId == userId && td.ClientInfo.DeviceFingerprint.Value == fingerprint,
-                cancellationToken);
+            .Where(td => td.UserId == userId && td.ClientInfo.DeviceFingerprint.Value == fingerprint)
+            .OrderBy(td => td.Status == DeviceStatus.Revoked)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<TrustedDevice>> GetByUserIdAsync(

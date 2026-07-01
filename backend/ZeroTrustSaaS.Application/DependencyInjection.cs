@@ -23,6 +23,8 @@ using ZeroTrustSaaS.Application.Features.Devices.GetTenantDevices;
 using ZeroTrustSaaS.Application.Features.Identity.ActivateUser;
 using ZeroTrustSaaS.Application.Features.Identity.GetUsers;
 using ZeroTrustSaaS.Application.Features.Identity.LockUser;
+using ZeroTrustSaaS.Application.Features.Identity.GetUserSessions;
+using ZeroTrustSaaS.Application.Features.Identity.RevokeUserSession;
 using ZeroTrustSaaS.Application.Features.Identity.RevokeUserSessions;
 using ZeroTrustSaaS.Application.Features.Identity.SuspendUser;
 using ZeroTrustSaaS.Application.Features.Identity.Login;
@@ -79,6 +81,7 @@ public static class DependencyInjection
         services.AddScoped<RemovePermissionFromRoleCommandHandler>();
         services.AddScoped<CreateTenantUserCommandHandler>();
         services.AddScoped<ForcePasswordResetCommandHandler>();
+        services.AddScoped<RevokeUserSessionCommandHandler>();
         services.AddScoped<CheckPlatformStatusQueryHandler>();
         services.AddScoped<InitializePlatformCommandHandler>();
 
@@ -94,6 +97,7 @@ public static class DependencyInjection
         services.AddScoped<GetRolesQueryHandler>();
         services.AddScoped<GetPermissionsQueryHandler>();
         services.AddScoped<GetAuditLogsQueryHandler>();
+        services.AddScoped<GetUserSessionsQueryHandler>();
         services.AddScoped<GetSecurityOverviewQueryHandler>();
 
         return services;

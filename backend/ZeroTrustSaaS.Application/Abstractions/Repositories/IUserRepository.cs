@@ -27,6 +27,8 @@ public interface IUserRepository
 
     Task<int> CountLockedByTenantAsync(Guid tenantId, CancellationToken cancellationToken = default);
 
+    Task<string?> GetSecurityStampAsync(Guid id, CancellationToken cancellationToken = default);
+
     Task AddAsync(User user, CancellationToken cancellationToken = default);
 
     void Update(User user);

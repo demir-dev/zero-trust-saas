@@ -110,7 +110,8 @@ function MfaSetupWizard({ open, onClose, onComplete }) {
     queryKey: ['mfa', 'setup'],
     queryFn: () => api.get('/auth/mfa/setup').then(r => r.data),
     enabled: open,
-    staleTime: Infinity,
+    staleTime: 0,
+    gcTime: 0,
   })
 
   const verifyMutation = useMutation({

@@ -1,3 +1,4 @@
+using ZeroTrustSaaS.Application.Common;
 using ZeroTrustSaaS.Domain.Common;
 
 namespace ZeroTrustSaaS.Application.Abstractions.Services;
@@ -11,4 +12,7 @@ public static class CurrentUserContextExtensions
         => ctx.HasPermission(permissionCode)
             ? Result.Success()
             : Result.Failure(AuthorizationErrors.InsufficientPermissions);
+
+    public static int GetTenantRoleLevel(this ICurrentUserContext ctx) =>
+        ctx.IsPlatformUser ? 100 : WellKnownPermissions.GetRoleLevel(ctx.TenantRole ?? string.Empty);
 }

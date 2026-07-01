@@ -36,6 +36,9 @@ internal sealed class HttpContextCurrentUserContext(IHttpContextAccessor httpCon
         httpContextAccessor.HttpContext?.User.FindAll("permission").Select(c => c.Value)
         ?? [];
 
+    public string? TenantRole =>
+        httpContextAccessor.HttpContext?.User.FindFirstValue("tenant_role");
+
     public string? IpAddress =>
         httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
 

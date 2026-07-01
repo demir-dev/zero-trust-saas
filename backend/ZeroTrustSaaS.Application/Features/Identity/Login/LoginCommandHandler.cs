@@ -5,6 +5,7 @@ using ZeroTrustSaaS.Domain.Audit;
 using ZeroTrustSaaS.Domain.Authorization;
 using ZeroTrustSaaS.Domain.Common;
 using ZeroTrustSaaS.Domain.Devices;
+using ZeroTrustSaaS.Domain.Devices.Errors;
 using ZeroTrustSaaS.Domain.Identity;
 using ZeroTrustSaaS.Domain.Identity.Enums;
 using ZeroTrustSaaS.Domain.Identity.Errors;
@@ -19,6 +20,7 @@ public sealed class LoginCommandHandler(
     ITenantRepository tenantRepository,
     ITenantMembershipRepository membershipRepository,
     IRoleRepository roleRepository,
+    ITrustedDeviceRepository trustedDeviceRepository,
     IAuditLogRepository auditLogRepository,
     IPasswordHasher passwordHasher,
     ITokenGenerator tokenGenerator,
@@ -99,6 +101,34 @@ public sealed class LoginCommandHandler(
                 return Result<LoginResponse>.Failure(UserErrors.InvalidCredentials);
         }
 
+        // Device tracking: update existing device or auto-register a new Pending one.
+        var fp = DeviceFingerprint.Create(command.DeviceFingerprint);
+        if (fp.IsSuccess)
+        {
+            var existing = await trustedDeviceRepository
+                .GetByFingerprintAsync(user.Id, fp.Value.Value, cancellationToken);
+
+            if (existing is not null && !existing.IsRevoked)
+            {
+                if (existing.IsBlocked)
+                    return Result<LoginResponse>.Failure(TrustedDeviceErrors.DeviceBlocked);
+
+                existing.RecordLogin(now);
+                trustedDeviceRepository.Update(existing);
+            }
+            else
+            {
+                var clientInfo = BuildClientInfo(command);
+                var nameResult = DeviceName.Create($"{command.Browser} on {command.OperatingSystem}");
+                if (nameResult.IsSuccess)
+                {
+                    var newDevice = TrustedDevice.Register(user.Id, nameResult.Value, clientInfo);
+                    if (newDevice.IsSuccess)
+                        await trustedDeviceRepository.AddAsync(newDevice.Value, cancellationToken);
+                }
+            }
+        }
+
         if (user.IsMfaEnabled)
         {
             var mfaAttemptResult = LoginAttempt.Create(
@@ -114,12 +144,16 @@ public sealed class LoginCommandHandler(
             userRepository.Update(user);
             await unitOfWork.SaveChangesAsync(cancellationToken);
 
+            var platformRoles = await roleRepository.GetUserRolesAsync(user.Id, null, cancellationToken);
+            bool isPlatformUser = platformRoles.Any(ur => ur.IsActive);
+
             return Result<LoginResponse>.Success(new LoginResponse(
                 AccessToken: null,
                 RefreshToken: null,
                 Result: LoginResult.MfaRequired,
                 RequiresMfa: true,
-                UserId: user.Id));
+                UserId: user.Id,
+                IsPlatformUser: isPlatformUser));
         }
 
         return await IssueTokensAsync(user, command, tenantId, now, cancellationToken);

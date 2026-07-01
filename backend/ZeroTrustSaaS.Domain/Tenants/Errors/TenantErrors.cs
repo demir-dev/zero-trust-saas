@@ -52,4 +52,7 @@ public static class TenantErrors
     public static readonly Error InvalidStatusTransition =
         Error.Conflict("Tenants.Tenant.InvalidStatusTransition",
             "The tenant is not in a state that allows this transition.");
+
+    public static readonly Error TenantSuspended =
+        Error.Unauthorized("Tenants.Tenant.Suspended", "The tenant account is suspended.");
 }

@@ -23,4 +23,9 @@ public static class TrustedDeviceErrors
         Error.NotFound(
             "Devices.TrustedDevice.NotFound",
             "Trusted device was not found.");
+
+    public static readonly Error DeviceBlocked =
+        Error.Forbidden(
+            "Devices.TrustedDevice.DeviceBlocked",
+            "This device has been blocked and cannot be used to sign in.");
 }

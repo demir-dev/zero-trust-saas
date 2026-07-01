@@ -12,10 +12,12 @@ namespace ZeroTrustSaaS.Application.Features.Identity.ForcePasswordReset;
 
 public sealed class ForcePasswordResetCommandHandler(
     IUserRepository userRepository,
+    IRoleRepository roleRepository,
     IAuditLogRepository auditLogRepository,
     ICurrentUserContext currentUser,
     IPasswordHasher passwordHasher,
     IDateTimeProvider dateTimeProvider,
+    ISecurityStampCache securityStampCache,
     IUnitOfWork unitOfWork)
 {
     private const string PasswordChars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -26,6 +28,14 @@ public sealed class ForcePasswordResetCommandHandler(
     {
         var permCheck = currentUser.RequirePermission(WellKnownPermissions.UserManage);
         if (permCheck.IsFailure) return Result<ForcePasswordResetResponse>.Failure(permCheck.Error);
+
+        if (!currentUser.IsPlatformUser)
+        {
+            var targetLevel = await GetTargetRoleLevelAsync(command.UserId, currentUser.TenantId, cancellationToken);
+            if (currentUser.GetTenantRoleLevel() <= targetLevel)
+                return Result<ForcePasswordResetResponse>.Failure(AuthorizationErrors.InsufficientHierarchyLevel);
+        }
+
         var user = await userRepository.GetByIdWithTokensAsync(command.UserId, cancellationToken);
 
         if (user is null)
@@ -57,8 +67,25 @@ public sealed class ForcePasswordResetCommandHandler(
             await auditLogRepository.AddAsync(logResult.Value, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        securityStampCache.Invalidate(command.UserId);
 
         return Result<ForcePasswordResetResponse>.Success(new ForcePasswordResetResponse(tempPassword));
+    }
+
+    private async Task<int> GetTargetRoleLevelAsync(Guid userId, Guid? tenantId, CancellationToken ct)
+    {
+        var userRoles = await roleRepository.GetUserRolesAsync(userId, tenantId, ct);
+        var maxLevel = 0;
+        foreach (var ur in userRoles.Where(r => r.IsActive))
+        {
+            var role = await roleRepository.GetByIdAsync(ur.RoleId, ct);
+            if (role is not null)
+            {
+                var lvl = WellKnownPermissions.GetRoleLevel(role.Name.Value);
+                if (lvl > maxLevel) maxLevel = lvl;
+            }
+        }
+        return maxLevel;
     }
 
     private static string GenerateTemporaryPassword(int length)

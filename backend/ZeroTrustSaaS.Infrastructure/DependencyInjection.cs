@@ -37,6 +37,10 @@ public static class DependencyInjection
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IPlatformConfigurationRepository, PlatformConfigurationRepository>();
 
+        services.AddMemoryCache();
+        services.AddScoped<ISecurityStampCache, SecurityStampCache>();
+        services.AddScoped<ITenantStatusCache, TenantStatusCache>();
+
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddSingleton<ITokenGenerator, JwtTokenGenerator>();
         services.AddSingleton<IDateTimeProvider, UtcDateTimeProvider>();

@@ -31,9 +31,14 @@ internal static class DashboardEndpoints
             ICurrentUserContext currentUser,
             int page = 1,
             int pageSize = 50,
+            Guid? userId = null,
             CancellationToken ct = default) =>
         {
-            var query = new GetAuditLogsQuery(currentUser.TenantId, null, page, pageSize);
+            var query = new GetAuditLogsQuery(
+                userId.HasValue ? null : currentUser.TenantId,
+                userId,
+                page,
+                pageSize);
             var result = await handler.Handle(query, ct);
 
             return result.IsSuccess
