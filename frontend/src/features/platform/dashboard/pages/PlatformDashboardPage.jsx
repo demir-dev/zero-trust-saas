@@ -2,10 +2,13 @@ import { Box, Grid, Card, CardContent, Typography, Skeleton, Divider } from '@mu
 import {
   Business as TenantsIcon,
   CheckCircle as ActiveIcon,
-  PauseCircle as SuspendedIcon,
-  AdminPanelSettings as UsersIcon,
   Security as SecurityIcon,
   Warning as WarningIcon,
+  PhonelinkLock as MfaIcon,
+  DevicesOther as TrustedDevicesIcon,
+  PhonelinkErase as RevokedDevicesIcon,
+  Block as BlockedDevicesIcon,
+  ListAlt as AuditIcon,
 } from '@mui/icons-material'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
@@ -46,7 +49,7 @@ export default function PlatformDashboardPage() {
   ]
 
   return (
-    <Box>
+    <Box sx={{ width: '100%' }}>
       <PageHeader
         title="Platform Dashboard"
         subtitle="Global view of your Zero Trust IAM platform"
@@ -62,7 +65,7 @@ export default function PlatformDashboardPage() {
         </Grid>
       </motion.div>
 
-      <Grid container spacing={3}>
+      <Grid container spacing={3} alignItems="stretch">
         <Grid item xs={12} md={8}>
           <Card>
             <CardContent>
@@ -118,26 +121,27 @@ export default function PlatformDashboardPage() {
           <Card sx={{ height: '100%' }}>
             <CardContent>
               <Typography variant="h6" fontWeight={600} mb={2}>Platform Health</Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                 {[
-                  { label: 'MFA Enabled Users', value: overview?.mfaEnabledCount, icon: '🔐' },
-                  { label: 'Trusted Devices', value: overview?.trustedDevicesCount, icon: '✅' },
-                  { label: 'Revoked Devices', value: overview?.revokedDevicesCount, icon: '🚫' },
-                  { label: 'Blocked Devices', value: overview?.blockedDevicesCount, icon: '⛔' },
-                  { label: 'Total Audit Events', value: overview?.auditLogCount, icon: '📋' },
-                ].map(({ label, value, icon }) => (
+                  { label: 'MFA Enabled Users', value: overview?.mfaEnabledCount, Icon: MfaIcon, color: 'primary.main' },
+                  { label: 'Trusted Devices', value: overview?.trustedDevicesCount, Icon: TrustedDevicesIcon, color: 'success.main' },
+                  { label: 'Revoked Devices', value: overview?.revokedDevicesCount, Icon: RevokedDevicesIcon, color: 'warning.main' },
+                  { label: 'Blocked Devices', value: overview?.blockedDevicesCount, Icon: BlockedDevicesIcon, color: 'error.main' },
+                  { label: 'Total Audit Events', value: overview?.auditLogCount, Icon: AuditIcon, color: 'text.secondary' },
+                ].map(({ label, value, Icon, color }) => (
                   <Box key={label}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="body2" color="text.secondary">
-                        {icon} {label}
-                      </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Icon sx={{ fontSize: 18, color }} />
+                        <Typography variant="body2" color="text.secondary">{label}</Typography>
+                      </Box>
                       {isLoading ? (
                         <Skeleton width={32} />
                       ) : (
                         <Typography variant="body2" fontWeight={600}>{value ?? '—'}</Typography>
                       )}
                     </Box>
-                    <Divider sx={{ mt: 1 }} />
+                    <Divider />
                   </Box>
                 ))}
               </Box>
