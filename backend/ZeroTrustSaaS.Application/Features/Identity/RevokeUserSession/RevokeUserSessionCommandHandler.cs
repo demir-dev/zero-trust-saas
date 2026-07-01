@@ -12,7 +12,7 @@ public sealed class RevokeUserSessionCommandHandler(
     IUserRepository userRepository,
     IAuditLogRepository auditLogRepository,
     ICurrentUserContext currentUser,
-    ISecurityStampCache securityStampCache,
+    ISessionStatusCache sessionStatusCache,
     IDateTimeProvider dateTimeProvider,
     IUnitOfWork unitOfWork)
 {
@@ -29,9 +29,8 @@ public sealed class RevokeUserSessionCommandHandler(
 
         var now = dateTimeProvider.UtcNow;
 
-        // Revoking any session rotates the stamp so the user's existing JWTs are
-        // immediately rejected by OnTokenValidated on the next authenticated request.
-        var result = user.RevokeAllUserRefreshTokens(now);
+        // Revoke only this specific session — other sessions continue to work.
+        var result = user.RevokeRefreshToken(command.SessionId, now);
         if (result.IsFailure) return result;
 
         userRepository.Update(user);
@@ -47,7 +46,9 @@ public sealed class RevokeUserSessionCommandHandler(
             await auditLogRepository.AddAsync(logResult.Value, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        securityStampCache.Invalidate(command.UserId);
+
+        // Invalidate the session cache entry so in-flight JWTs with this session_id are rejected.
+        sessionStatusCache.Invalidate(command.SessionId);
 
         return Result.Success();
     }

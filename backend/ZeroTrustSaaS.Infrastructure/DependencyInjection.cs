@@ -40,6 +40,8 @@ public static class DependencyInjection
         services.AddMemoryCache();
         services.AddScoped<ISecurityStampCache, SecurityStampCache>();
         services.AddScoped<ITenantStatusCache, TenantStatusCache>();
+        services.AddScoped<ISessionStatusCache, SessionStatusCache>();
+        services.AddScoped<IDeviceStatusCache, DeviceStatusCache>();
 
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddSingleton<ITokenGenerator, JwtTokenGenerator>();

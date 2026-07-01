@@ -16,6 +16,10 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
 
         builder.Property(rt => rt.TenantId);
 
+        builder.Property(rt => rt.TrustedDeviceId)
+            .HasColumnName("trusted_device_id")
+            .IsRequired(false);
+
         builder.OwnsOne(rt => rt.TokenHash, th =>
         {
             th.Property(h => h.Value)

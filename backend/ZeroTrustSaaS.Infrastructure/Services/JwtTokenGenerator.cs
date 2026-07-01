@@ -20,7 +20,9 @@ internal sealed class JwtTokenGenerator(IOptions<JwtSettings> jwtSettings) : ITo
         IEnumerable<string> platformRoles,
         Guid? tenantId,
         string? tenantRole,
-        IEnumerable<string> permissions)
+        IEnumerable<string> permissions,
+        Guid? sessionId = null,
+        Guid? deviceId = null)
     {
         var claims = new List<Claim>
         {
@@ -41,6 +43,12 @@ internal sealed class JwtTokenGenerator(IOptions<JwtSettings> jwtSettings) : ITo
 
         foreach (var permission in permissions)
             claims.Add(new Claim("permission", permission));
+
+        if (sessionId.HasValue)
+            claims.Add(new Claim("session_id", sessionId.Value.ToString()));
+
+        if (deviceId.HasValue)
+            claims.Add(new Claim("device_id", deviceId.Value.ToString()));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.SecretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

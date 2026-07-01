@@ -46,6 +46,7 @@ export default function LoginPage() {
   const [mfaPending, setMfaPending] = useState(null) // { userId, tenantSlug }
   const [mfaCode, setMfaCode] = useState('')
   const [useRecovery, setUseRecovery] = useState(false)
+  const [trustDevice, setTrustDevice] = useState(false)
 
   const initMessage = location.state?.message
   const sessionExpired = new URLSearchParams(location.search).get('reason') === 'expired'
@@ -62,6 +63,7 @@ export default function LoginPage() {
         mfaCode.trim(),
         useRecovery,
         deviceInfo,
+        trustDevice,
       )
       if (!result.accessToken) {
         setError({ response: { data: { title: 'Invalid code', detail: 'The code you entered is incorrect. Please try again.' } } })
@@ -362,6 +364,16 @@ export default function LoginPage() {
                       size="small"
                       autoFocus
                       onKeyDown={(e) => e.key === 'Enter' && onMfaSubmit()}
+                    />
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={trustDevice}
+                          onChange={(e) => setTrustDevice(e.target.checked)}
+                        />
+                      }
+                      label={<Typography variant="body2">Trust this device</Typography>}
                     />
                     <Button
                       variant="contained"

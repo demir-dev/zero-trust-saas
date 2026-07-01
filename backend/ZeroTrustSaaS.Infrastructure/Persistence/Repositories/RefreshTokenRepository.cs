@@ -14,6 +14,14 @@ internal sealed class RefreshTokenRepository(AppDbContext dbContext) : IRefreshT
             .FirstOrDefaultAsync(rt => rt.TokenHash.Value == tokenHash, cancellationToken);
     }
 
+    public Task<RefreshToken?> GetByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.RefreshTokens
+            .FirstOrDefaultAsync(rt => rt.Id == id, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<RefreshToken>> GetActiveByUserIdAsync(
         Guid userId,
         CancellationToken cancellationToken = default)

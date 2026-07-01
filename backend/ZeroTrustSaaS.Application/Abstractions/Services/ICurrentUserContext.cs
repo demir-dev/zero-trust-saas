@@ -17,4 +17,8 @@ public interface ICurrentUserContext
     string? IpAddress { get; }
 
     string? UserAgent { get; }
+
+    Guid? SessionId { get; }
+
+    Guid? DeviceId { get; }
 }
