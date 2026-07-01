@@ -16,6 +16,7 @@ public sealed class RefreshToken : Entity
         Guid id,
         Guid userId,
         Guid? tenantId,
+        Guid? trustedDeviceId,
         RefreshTokenHash tokenHash,
         ClientInfo issuedClient,
         DateTime issuedAtUtc,
@@ -24,6 +25,7 @@ public sealed class RefreshToken : Entity
     {
         UserId = userId;
         TenantId = tenantId;
+        TrustedDeviceId = trustedDeviceId;
         TokenHash = tokenHash;
         IssuedClient = issuedClient;
         IssuedAtUtc = issuedAtUtc;
@@ -34,6 +36,9 @@ public sealed class RefreshToken : Entity
 
     // Null = platform-context token; set = tenant-context token.
     public Guid? TenantId { get; private set; }
+
+    // Null for tokens issued before device-aware JWT was introduced.
+    public Guid? TrustedDeviceId { get; private set; }
 
     public RefreshTokenHash TokenHash { get; private set; } = null!;
 
@@ -73,7 +78,8 @@ public sealed class RefreshToken : Entity
         ClientInfo issuedClient,
         DateTime issuedAtUtc,
         DateTime expiresAtUtc,
-        Guid? tenantId = null)
+        Guid? tenantId = null,
+        Guid? trustedDeviceId = null)
     {
         if (expiresAtUtc <= issuedAtUtc)
         {
@@ -85,6 +91,7 @@ public sealed class RefreshToken : Entity
             Guid.NewGuid(),
             userId,
             tenantId,
+            trustedDeviceId,
             tokenHash,
             issuedClient,
             issuedAtUtc,

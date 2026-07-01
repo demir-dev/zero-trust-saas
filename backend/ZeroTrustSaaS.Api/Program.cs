@@ -7,6 +7,7 @@ using ZeroTrustSaaS.Api.Endpoints;
 using ZeroTrustSaaS.Api.Services;
 using ZeroTrustSaaS.Application;
 using ZeroTrustSaaS.Application.Abstractions.Services;
+using ZeroTrustSaaS.Domain.Devices;
 using Microsoft.EntityFrameworkCore;
 using ZeroTrustSaaS.Infrastructure;
 using ZeroTrustSaaS.Infrastructure.Persistence;
@@ -71,7 +72,35 @@ builder.Services
                     var tenantStatusCache = context.HttpContext.RequestServices
                         .GetRequiredService<ITenantStatusCache>();
                     if (!await tenantStatusCache.IsActiveAsync(tenantId, context.HttpContext.RequestAborted))
+                    {
                         context.Fail("Tenant is suspended.");
+                        return;
+                    }
+                }
+
+                var sessionIdClaim = context.Principal?.FindFirstValue("session_id");
+                if (sessionIdClaim is not null && Guid.TryParse(sessionIdClaim, out var sessionId))
+                {
+                    var sessionCache = context.HttpContext.RequestServices
+                        .GetRequiredService<ISessionStatusCache>();
+                    if (!await sessionCache.IsActiveAsync(sessionId, context.HttpContext.RequestAborted))
+                    {
+                        context.Fail("Session has been revoked.");
+                        return;
+                    }
+                }
+
+                var deviceIdClaim = context.Principal?.FindFirstValue("device_id");
+                if (deviceIdClaim is not null && Guid.TryParse(deviceIdClaim, out var deviceId))
+                {
+                    var deviceCache = context.HttpContext.RequestServices
+                        .GetRequiredService<IDeviceStatusCache>();
+                    var deviceStatus = await deviceCache.GetStatusAsync(deviceId, context.HttpContext.RequestAborted);
+                    if (deviceStatus is DeviceStatus.Blocked or DeviceStatus.Revoked)
+                    {
+                        context.Fail("Device is blocked or revoked.");
+                        return;
+                    }
                 }
             }
         };

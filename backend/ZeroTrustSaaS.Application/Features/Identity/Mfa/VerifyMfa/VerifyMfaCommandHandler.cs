@@ -7,6 +7,7 @@ using ZeroTrustSaaS.Domain.Audit;
 using ZeroTrustSaaS.Domain.Authorization;
 using ZeroTrustSaaS.Domain.Common;
 using ZeroTrustSaaS.Domain.Devices;
+using ZeroTrustSaaS.Domain.Devices.Errors;
 using ZeroTrustSaaS.Domain.Identity;
 using ZeroTrustSaaS.Domain.Identity.Enums;
 using ZeroTrustSaaS.Domain.Identity.Errors;
@@ -21,6 +22,7 @@ public sealed class VerifyMfaCommandHandler(
     ITenantRepository tenantRepository,
     ITenantMembershipRepository membershipRepository,
     IRoleRepository roleRepository,
+    ITrustedDeviceRepository trustedDeviceRepository,
     IAuditLogRepository auditLogRepository,
     IMfaCodeValidator mfaCodeValidator,
     ITokenGenerator tokenGenerator,
@@ -110,6 +112,31 @@ public sealed class VerifyMfaCommandHandler(
     {
         var now = dateTimeProvider.UtcNow;
 
+        // Resolve the device associated with this MFA verification.
+        Guid? deviceId = null;
+        var fp = DeviceFingerprint.Create(command.DeviceFingerprint);
+        if (fp.IsSuccess)
+        {
+            var device = await trustedDeviceRepository
+                .GetByFingerprintAsync(user.Id, fp.Value.Value, cancellationToken);
+
+            if (device is not null)
+            {
+                if (device.IsBlocked)
+                    return Result<LoginResponse>.Failure(TrustedDeviceErrors.DeviceBlocked);
+
+                if (!device.IsRevoked)
+                {
+                    if (command.TrustDevice && device.IsPending)
+                    {
+                        device.Trust(now);
+                        trustedDeviceRepository.Update(device);
+                    }
+                    deviceId = device.Id;
+                }
+            }
+        }
+
         string rawRefreshToken = tokenGenerator.GenerateRefreshTokenValue();
         string hashedToken = tokenGenerator.HashRefreshToken(rawRefreshToken);
 
@@ -117,7 +144,6 @@ public sealed class VerifyMfaCommandHandler(
         if (tokenHashResult.IsFailure)
             return Result<LoginResponse>.Failure(tokenHashResult.Error);
 
-        var fp = DeviceFingerprint.Create(command.DeviceFingerprint);
         var ip = IpAddress.Create(command.IpAddress);
         var clientInfoResult = ClientInfo.Create(
             fp.IsSuccess ? fp.Value : DeviceFingerprint.From("unknown"),
@@ -137,7 +163,8 @@ public sealed class VerifyMfaCommandHandler(
             clientInfo,
             now,
             now.Add(RefreshTokenLifetime),
-            tenantId);
+            tenantId,
+            trustedDeviceId: deviceId);
 
         if (refreshTokenResult.IsFailure)
             return Result<LoginResponse>.Failure(refreshTokenResult.Error);
@@ -155,6 +182,8 @@ public sealed class VerifyMfaCommandHandler(
 
         if (attemptResult.IsSuccess)
             user.RecordSuccessfulLogin(attemptResult.Value, now);
+
+        var sessionId = refreshTokenResult.Value.Id;
 
         string accessToken;
 
@@ -177,7 +206,9 @@ public sealed class VerifyMfaCommandHandler(
                 platformRoleNames,
                 tenantId: null,
                 tenantRole: null,
-                permissions: []);
+                permissions: [],
+                sessionId: sessionId,
+                deviceId: deviceId);
         }
         else
         {
@@ -204,7 +235,9 @@ public sealed class VerifyMfaCommandHandler(
                 platformRoles: [],
                 tenantId: tenantId,
                 tenantRole: tenantRoleName,
-                permissions: permissionCodes);
+                permissions: permissionCodes,
+                sessionId: sessionId,
+                deviceId: deviceId);
         }
 
         userRepository.Update(user);

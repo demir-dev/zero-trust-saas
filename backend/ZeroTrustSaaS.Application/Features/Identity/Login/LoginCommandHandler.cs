@@ -101,7 +101,9 @@ public sealed class LoginCommandHandler(
                 return Result<LoginResponse>.Failure(UserErrors.InvalidCredentials);
         }
 
-        // Device tracking: update existing device or auto-register a new Pending one.
+        // Device tracking: update existing device or auto-register a new one.
+        // Returns the device Id to carry into the JWT and refresh token.
+        Guid? deviceId = null;
         var fp = DeviceFingerprint.Create(command.DeviceFingerprint);
         if (fp.IsSuccess)
         {
@@ -115,6 +117,7 @@ public sealed class LoginCommandHandler(
 
                 existing.RecordLogin(now);
                 trustedDeviceRepository.Update(existing);
+                deviceId = existing.Id;
             }
             else
             {
@@ -122,9 +125,16 @@ public sealed class LoginCommandHandler(
                 var nameResult = DeviceName.Create($"{command.Browser} on {command.OperatingSystem}");
                 if (nameResult.IsSuccess)
                 {
-                    var newDevice = TrustedDevice.Register(user.Id, nameResult.Value, clientInfo);
-                    if (newDevice.IsSuccess)
-                        await trustedDeviceRepository.AddAsync(newDevice.Value, cancellationToken);
+                    var newDeviceResult = TrustedDevice.Register(user.Id, nameResult.Value, clientInfo);
+                    if (newDeviceResult.IsSuccess)
+                    {
+                        var newDevice = newDeviceResult.Value;
+                        // No MFA path: auto-trust the new device immediately.
+                        if (!user.IsMfaEnabled)
+                            newDevice.Trust(now);
+                        await trustedDeviceRepository.AddAsync(newDevice, cancellationToken);
+                        deviceId = newDevice.Id;
+                    }
                 }
             }
         }
@@ -156,13 +166,14 @@ public sealed class LoginCommandHandler(
                 IsPlatformUser: isPlatformUser));
         }
 
-        return await IssueTokensAsync(user, command, tenantId, now, cancellationToken);
+        return await IssueTokensAsync(user, command, tenantId, deviceId, now, cancellationToken);
     }
 
     private async Task<Result<LoginResponse>> IssueTokensAsync(
         User user,
         LoginCommand command,
         Guid? tenantId,
+        Guid? deviceId,
         DateTime now,
         CancellationToken cancellationToken)
     {
@@ -180,7 +191,8 @@ public sealed class LoginCommandHandler(
             tokenClientInfo,
             now,
             now.Add(RefreshTokenLifetime),
-            tenantId);
+            tenantId,
+            trustedDeviceId: deviceId);
 
         if (refreshTokenResult.IsFailure)
             return Result<LoginResponse>.Failure(refreshTokenResult.Error);
@@ -199,6 +211,8 @@ public sealed class LoginCommandHandler(
 
         if (successAttemptResult.IsSuccess)
             user.RecordSuccessfulLogin(successAttemptResult.Value, now);
+
+        var sessionId = refreshTokenResult.Value.Id;
 
         // Build JWT claims based on login context.
         string accessToken;
@@ -223,7 +237,9 @@ public sealed class LoginCommandHandler(
                 platformRoleNames,
                 tenantId: null,
                 tenantRole: null,
-                permissions: []);
+                permissions: [],
+                sessionId: sessionId,
+                deviceId: deviceId);
         }
         else
         {
@@ -251,7 +267,9 @@ public sealed class LoginCommandHandler(
                 platformRoles: [],
                 tenantId: tenantId,
                 tenantRole: tenantRoleName,
-                permissions: permissionCodes);
+                permissions: permissionCodes,
+                sessionId: sessionId,
+                deviceId: deviceId);
         }
 
         userRepository.Update(user);

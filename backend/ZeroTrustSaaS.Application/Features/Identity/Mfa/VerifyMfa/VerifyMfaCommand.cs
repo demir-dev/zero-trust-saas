@@ -10,4 +10,5 @@ public sealed record VerifyMfaCommand(
     string DeviceFingerprint,
     string Country,
     string Browser,
-    string OperatingSystem);
+    string OperatingSystem,
+    bool TrustDevice = false);

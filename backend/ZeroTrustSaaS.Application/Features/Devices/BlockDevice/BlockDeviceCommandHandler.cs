@@ -10,7 +10,8 @@ public sealed class BlockDeviceCommandHandler(
     ITrustedDeviceRepository deviceRepository,
     IUserRepository userRepository,
     IDateTimeProvider dateTimeProvider,
-    ISecurityStampCache securityStampCache,
+    ISessionStatusCache sessionStatusCache,
+    IDeviceStatusCache deviceStatusCache,
     IUnitOfWork unitOfWork)
 {
     public async Task<Result> Handle(
@@ -30,17 +31,36 @@ public sealed class BlockDeviceCommandHandler(
         deviceRepository.Update(device);
 
         var now = dateTimeProvider.UtcNow;
+
+        // Revoke only sessions that belong to this device; leave other devices' sessions alive.
         var user = await userRepository.GetByIdWithTokensAsync(device.UserId, cancellationToken);
         if (user is not null)
         {
-            user.RevokeAllUserRefreshTokens(now);
-            userRepository.Update(user);
+            var deviceSessions = user.RefreshTokens
+                .Where(rt => rt.TrustedDeviceId == device.Id && rt.IsActive)
+                .ToList();
+
+            foreach (var session in deviceSessions)
+                user.RevokeRefreshToken(session.Id, now);
+
+            if (deviceSessions.Count > 0)
+                userRepository.Update(user);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
+        // Invalidate each revoked session and the device status so in-flight JWTs are rejected.
         if (user is not null)
-            securityStampCache.Invalidate(device.UserId);
+        {
+            var revokedIds = user.RefreshTokens
+                .Where(rt => rt.TrustedDeviceId == device.Id)
+                .Select(rt => rt.Id);
+
+            foreach (var sessionId in revokedIds)
+                sessionStatusCache.Invalidate(sessionId);
+        }
+
+        deviceStatusCache.Invalidate(device.Id);
 
         return Result.Success();
     }

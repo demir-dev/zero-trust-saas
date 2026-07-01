@@ -71,13 +71,14 @@ export function AuthProvider({ children }) {
     return { result, requiresMfa, userId, accessToken: token }
   }, [applyToken])
 
-  const verifyMfa = useCallback(async (userId, tenantSlug, code, isRecoveryCode, extraDeviceInfo) => {
+  const verifyMfa = useCallback(async (userId, tenantSlug, code, isRecoveryCode, extraDeviceInfo, trustDevice = false) => {
     const deviceInfo = { ...await buildDeviceInfo(), ...extraDeviceInfo }
     const res = await api.post('/auth/mfa/verify', {
       userId,
       tenantSlug: tenantSlug ?? null,
       code,
       isRecoveryCode,
+      trustDevice,
       ...deviceInfo,
     })
     const { accessToken: token, refreshToken, result, requiresMfa, userId: uid } = res.data

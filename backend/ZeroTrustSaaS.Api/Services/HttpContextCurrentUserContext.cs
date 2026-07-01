@@ -44,4 +44,22 @@ internal sealed class HttpContextCurrentUserContext(IHttpContextAccessor httpCon
 
     public string? UserAgent =>
         httpContextAccessor.HttpContext?.Request.Headers.UserAgent.ToString();
+
+    public Guid? SessionId
+    {
+        get
+        {
+            var value = httpContextAccessor.HttpContext?.User.FindFirstValue("session_id");
+            return Guid.TryParse(value, out var id) ? id : null;
+        }
+    }
+
+    public Guid? DeviceId
+    {
+        get
+        {
+            var value = httpContextAccessor.HttpContext?.User.FindFirstValue("device_id");
+            return Guid.TryParse(value, out var id) ? id : null;
+        }
+    }
 }

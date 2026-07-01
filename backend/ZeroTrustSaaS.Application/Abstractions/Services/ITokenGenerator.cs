@@ -9,7 +9,9 @@ public interface ITokenGenerator
         IEnumerable<string> platformRoles,
         Guid? tenantId,
         string? tenantRole,
-        IEnumerable<string> permissions);
+        IEnumerable<string> permissions,
+        Guid? sessionId = null,
+        Guid? deviceId = null);
 
     /// <summary>
     /// Generates a cryptographically secure random refresh token value.

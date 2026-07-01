@@ -19,6 +19,7 @@ public sealed class RefreshTokenCommandHandler(
     IAuditLogRepository auditLogRepository,
     ITokenGenerator tokenGenerator,
     ITenantStatusCache tenantStatusCache,
+    ISessionStatusCache sessionStatusCache,
     IDateTimeProvider dateTimeProvider,
     IUnitOfWork unitOfWork)
 {
@@ -39,17 +40,34 @@ public sealed class RefreshTokenCommandHandler(
         {
             if (existingToken.IsRevoked)
             {
-                var user = await userRepository.GetByIdWithTokensAsync(existingToken.UserId, cancellationToken);
+                // Revoked token presented — potential token theft; kill all sessions.
+                var attackedUser = await userRepository.GetByIdWithTokensAsync(existingToken.UserId, cancellationToken);
 
-                if (user is not null)
+                if (attackedUser is not null)
                 {
                     var now2 = dateTimeProvider.UtcNow;
-                    user.RevokeAllUserRefreshTokens(now2);
-                    userRepository.Update(user);
+                    attackedUser.RevokeAllUserRefreshTokens(now2);
+                    userRepository.Update(attackedUser);
                     await unitOfWork.SaveChangesAsync(cancellationToken);
                 }
 
                 return Result<RefreshTokenResponse>.Failure(UserErrors.RefreshTokenAlreadyRevoked);
+            }
+
+            if (existingToken.IsUsed)
+            {
+                // Already-rotated token presented — replay attack; kill all sessions.
+                var attackedUser = await userRepository.GetByIdWithTokensAsync(existingToken.UserId, cancellationToken);
+
+                if (attackedUser is not null)
+                {
+                    var now2 = dateTimeProvider.UtcNow;
+                    attackedUser.RevokeAllUserRefreshTokens(now2);
+                    userRepository.Update(attackedUser);
+                    await unitOfWork.SaveChangesAsync(cancellationToken);
+                }
+
+                return Result<RefreshTokenResponse>.Failure(RefreshTokenErrors.AlreadyUsed);
             }
 
             if (existingToken.IsExpired)
@@ -95,13 +113,15 @@ public sealed class RefreshTokenCommandHandler(
         if (newTokenHashResult.IsFailure)
             return Result<RefreshTokenResponse>.Failure(newTokenHashResult.Error);
 
+        // Carry the device association forward through the rotation chain.
         var newRefreshTokenResult = Domain.Identity.RefreshToken.Create(
             activeUser.Id,
             newTokenHashResult.Value,
             clientInfo,
             now,
             now.Add(RefreshTokenLifetime),
-            tenantId);
+            tenantId,
+            trustedDeviceId: existingToken.TrustedDeviceId);
 
         if (newRefreshTokenResult.IsFailure)
             return Result<RefreshTokenResponse>.Failure(newRefreshTokenResult.Error);
@@ -113,6 +133,9 @@ public sealed class RefreshTokenCommandHandler(
         var issueResult = activeUser.IssueRefreshToken(newRefreshTokenResult.Value, now);
         if (issueResult.IsFailure)
             return Result<RefreshTokenResponse>.Failure(issueResult.Error);
+
+        var newSessionId = newRefreshTokenResult.Value.Id;
+        var deviceId = existingToken.TrustedDeviceId;
 
         // Re-build JWT claims matching the same context as the original token.
         string accessToken;
@@ -136,7 +159,9 @@ public sealed class RefreshTokenCommandHandler(
                 platformRoleNames,
                 tenantId: null,
                 tenantRole: null,
-                permissions: []);
+                permissions: [],
+                sessionId: newSessionId,
+                deviceId: deviceId);
         }
         else
         {
@@ -163,7 +188,9 @@ public sealed class RefreshTokenCommandHandler(
                 platformRoles: [],
                 tenantId: tenantId,
                 tenantRole: tenantRoleName,
-                permissions: permissionCodes);
+                permissions: permissionCodes,
+                sessionId: newSessionId,
+                deviceId: deviceId);
         }
 
         refreshTokenRepository.Update(existingToken);
@@ -182,6 +209,9 @@ public sealed class RefreshTokenCommandHandler(
             await auditLogRepository.AddAsync(logResult.Value, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Invalidate old session immediately after commit — prevents reuse of old JWT's session_id.
+        sessionStatusCache.Invalidate(existingToken.Id);
 
         return Result<RefreshTokenResponse>.Success(new RefreshTokenResponse(
             AccessToken: accessToken,
