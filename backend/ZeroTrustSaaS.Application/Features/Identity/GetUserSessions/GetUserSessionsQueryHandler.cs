@@ -7,34 +7,41 @@ using ZeroTrustSaaS.Domain.Identity.Errors;
 namespace ZeroTrustSaaS.Application.Features.Identity.GetUserSessions;
 
 public sealed class GetUserSessionsQueryHandler(
-    IRefreshTokenRepository refreshTokenRepository,
+    ISessionRepository sessionRepository,
     IUserRepository userRepository,
     ICurrentUserContext currentUser)
 {
-    public async Task<Result<IReadOnlyList<ActiveSessionDto>>> Handle(
+    public async Task<Result<IReadOnlyList<SessionDto>>> Handle(
         GetUserSessionsQuery query,
         CancellationToken cancellationToken = default)
     {
         var permCheck = currentUser.RequirePermission(WellKnownPermissions.UserView);
-        if (permCheck.IsFailure) return Result<IReadOnlyList<ActiveSessionDto>>.Failure(permCheck.Error);
+        if (permCheck.IsFailure) return Result<IReadOnlyList<SessionDto>>.Failure(permCheck.Error);
 
         var user = await userRepository.GetByIdAsync(query.UserId, cancellationToken);
         if (user is null)
-            return Result<IReadOnlyList<ActiveSessionDto>>.Failure(UserErrors.NotFound);
+            return Result<IReadOnlyList<SessionDto>>.Failure(UserErrors.NotFound);
 
-        var tokens = await refreshTokenRepository.GetActiveByUserIdAsync(query.UserId, cancellationToken);
+        var sessions = await sessionRepository.GetRecentByUserIdAsync(query.UserId, cancellationToken);
 
-        var sessions = tokens.Select(t => new ActiveSessionDto(
-            Id: t.Id,
-            IssuedAtUtc: t.IssuedAtUtc,
-            ExpiresAtUtc: t.ExpiresAtUtc,
-            IpAddress: t.IssuedClient.IpAddress.Value == string.Empty ? null : t.IssuedClient.IpAddress.Value,
-            Browser: t.IssuedClient.Browser,
-            OperatingSystem: t.IssuedClient.OperatingSystem,
-            Country: t.IssuedClient.Country,
-            TenantId: t.TenantId))
+        var dtos = sessions
+            .Select(s => new SessionDto(
+                Id: s.Id,
+                Status: s.Status,
+                CreatedAtUtc: s.CreatedAtUtc,
+                LastSeenAtUtc: s.LastSeenAtUtc,
+                LastActivityUtc: s.LastActivityUtc,
+                ExpiresAtUtc: s.ExpiresAtUtc,
+                RevokedAtUtc: s.RevokedAtUtc,
+                IpAddress: s.IpAddress,
+                Browser: s.Browser,
+                OperatingSystem: s.OperatingSystem,
+                Country: s.Country,
+                TenantId: s.TenantId,
+                TrustedDeviceId: s.TrustedDeviceId,
+                IsCurrentSession: s.Id == currentUser.SessionId))
             .ToList();
 
-        return Result<IReadOnlyList<ActiveSessionDto>>.Success(sessions);
+        return Result<IReadOnlyList<SessionDto>>.Success(dtos);
     }
 }

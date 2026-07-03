@@ -11,7 +11,6 @@ using ZeroTrustSaaS.Domain.Identity.Enums;
 using ZeroTrustSaaS.Domain.Identity.Errors;
 using ZeroTrustSaaS.Domain.Security;
 using ZeroTrustSaaS.Domain.Security.Enums;
-using DomainRefreshToken = ZeroTrustSaaS.Domain.Identity.RefreshToken;
 
 namespace ZeroTrustSaaS.Application.Features.Identity.Login;
 
@@ -23,21 +22,17 @@ public sealed class LoginCommandHandler(
     ITrustedDeviceRepository trustedDeviceRepository,
     IAuditLogRepository auditLogRepository,
     IPasswordHasher passwordHasher,
-    ITokenGenerator tokenGenerator,
+    ITokenIssuanceService tokenIssuanceService,
     IDateTimeProvider dateTimeProvider,
     IUnitOfWork unitOfWork)
 {
-    private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(30);
-
     public async Task<Result<LoginResponse>> Handle(
         LoginCommand command,
         CancellationToken cancellationToken = default)
     {
         var now = dateTimeProvider.UtcNow;
 
-        // Platform login when no slug is provided; tenant login otherwise.
         bool isTenantLogin = !string.IsNullOrWhiteSpace(command.TenantSlug);
-
         Guid? tenantId = null;
 
         if (isTenantLogin)
@@ -45,7 +40,6 @@ public sealed class LoginCommandHandler(
             var normalizedSlug = command.TenantSlug!.Trim().ToLowerInvariant();
             var tenant = await tenantRepository.GetBySlugAsync(normalizedSlug, cancellationToken);
 
-            // Generic error — do not reveal whether slug exists (prevents tenant enumeration).
             if (tenant is null || !tenant.IsActive)
                 return Result<LoginResponse>.Failure(UserErrors.InvalidCredentials);
 
@@ -69,16 +63,13 @@ public sealed class LoginCommandHandler(
                     user.RecordFailedLogin(failedAttemptResult.Value, now);
 
                 var failedAuditIp = IpAddress.Create(command.IpAddress);
-                await LogSecurityEvent(
+                await LogAuditEvent(
                     SecurityEventType.LoginFailed,
                     AuditSeverity.Warning,
-                    now,
-                    user.Id,
-                    tenantId,
+                    now, user.Id, tenantId,
                     failedAuditIp.IsSuccess ? failedAuditIp.Value : null,
                     command.UserAgent,
-                    auditLogRepository,
-                    cancellationToken);
+                    auditLogRepository, cancellationToken);
 
                 userRepository.Update(user);
             }
@@ -93,7 +84,6 @@ public sealed class LoginCommandHandler(
                 user.IsLocked ? UserErrors.UserIsLocked : UserErrors.UserIsSuspended);
         }
 
-        // For tenant login, validate an active membership exists.
         if (isTenantLogin)
         {
             var membership = await membershipRepository.GetAsync(tenantId!.Value, user.Id, cancellationToken);
@@ -101,8 +91,7 @@ public sealed class LoginCommandHandler(
                 return Result<LoginResponse>.Failure(UserErrors.InvalidCredentials);
         }
 
-        // Device tracking: update existing device or auto-register a new one.
-        // Returns the device Id to carry into the JWT and refresh token.
+        // Device resolution: update existing or register new.
         Guid? deviceId = null;
         var fp = DeviceFingerprint.Create(command.DeviceFingerprint);
         if (fp.IsSuccess)
@@ -167,45 +156,16 @@ public sealed class LoginCommandHandler(
                 IsPlatformUser: isPlatformUser));
         }
 
-        return await IssueTokensAsync(user, command, tenantId, deviceId, now, cancellationToken);
-    }
+        var clientInfoForIssuance = BuildClientInfo(command);
+        var issuanceResult = await tokenIssuanceService.IssueAsync(
+            user, tenantId, deviceId, clientInfoForIssuance, command.UserAgent, now, cancellationToken);
 
-    private async Task<Result<LoginResponse>> IssueTokensAsync(
-        User user,
-        LoginCommand command,
-        Guid? tenantId,
-        Guid? deviceId,
-        DateTime now,
-        CancellationToken cancellationToken)
-    {
-        string rawRefreshToken = tokenGenerator.GenerateRefreshTokenValue();
-        string hashedToken = tokenGenerator.HashRefreshToken(rawRefreshToken);
+        if (issuanceResult.IsFailure)
+            return Result<LoginResponse>.Failure(issuanceResult.Error);
 
-        var tokenHashResult = RefreshTokenHash.Create(hashedToken);
-        if (tokenHashResult.IsFailure)
-            return Result<LoginResponse>.Failure(tokenHashResult.Error);
-
-        var tokenClientInfo = BuildClientInfo(command);
-        var refreshTokenResult = DomainRefreshToken.Create(
-            user.Id,
-            tokenHashResult.Value,
-            tokenClientInfo,
-            now,
-            now.Add(RefreshTokenLifetime),
-            tenantId,
-            trustedDeviceId: deviceId);
-
-        if (refreshTokenResult.IsFailure)
-            return Result<LoginResponse>.Failure(refreshTokenResult.Error);
-
-        var issueResult = user.IssueRefreshToken(refreshTokenResult.Value, now);
-        if (issueResult.IsFailure)
-            return Result<LoginResponse>.Failure(issueResult.Error);
-
-        var attemptClientInfo = BuildClientInfo(command);
         var successAttemptResult = LoginAttempt.Create(
             user.Id,
-            attemptClientInfo,
+            clientInfoForIssuance,
             LoginResult.Success,
             RiskLevel.Low,
             now);
@@ -213,85 +173,22 @@ public sealed class LoginCommandHandler(
         if (successAttemptResult.IsSuccess)
             user.RecordSuccessfulLogin(successAttemptResult.Value, now);
 
-        var sessionId = refreshTokenResult.Value.Id;
-
-        // Build JWT claims based on login context.
-        string accessToken;
-
-        if (tenantId is null)
-        {
-            // Platform login: emit platform_role claims, no tenant context.
-            var userRoles = await roleRepository.GetUserRolesAsync(user.Id, null, cancellationToken);
-            var platformRoleNames = new List<string>();
-
-            foreach (var ur in userRoles.Where(r => r.IsActive))
-            {
-                var role = await roleRepository.GetByIdAsync(ur.RoleId, cancellationToken);
-                if (role is not null)
-                    platformRoleNames.Add(role.Name.Value);
-            }
-
-            accessToken = tokenGenerator.GenerateJwtToken(
-                user.Id,
-                user.Email.Value,
-                user.SecurityStamp.Value.ToString(),
-                platformRoleNames,
-                tenantId: null,
-                tenantRole: null,
-                permissions: [],
-                sessionId: sessionId,
-                deviceId: deviceId);
-        }
-        else
-        {
-            // Tenant login: emit tenant_id, tenant_role, permission claims.
-            var userRoles = await roleRepository.GetUserRolesAsync(user.Id, tenantId, cancellationToken);
-            var activeUserRole = userRoles.FirstOrDefault(ur => ur.IsActive);
-
-            string tenantRoleName = string.Empty;
-            var permissionCodes = new List<string>();
-
-            if (activeUserRole is not null)
-            {
-                var role = await roleRepository.GetByIdAsync(activeUserRole.RoleId, cancellationToken);
-                if (role is not null)
-                {
-                    tenantRoleName = role.Name.Value;
-                    permissionCodes.AddRange(role.Permissions.Select(p => p.Code.Value));
-                }
-            }
-
-            accessToken = tokenGenerator.GenerateJwtToken(
-                user.Id,
-                user.Email.Value,
-                user.SecurityStamp.Value.ToString(),
-                platformRoles: [],
-                tenantId: tenantId,
-                tenantRole: tenantRoleName,
-                permissions: permissionCodes,
-                sessionId: sessionId,
-                deviceId: deviceId);
-        }
-
         userRepository.Update(user);
 
         var auditIpResult = IpAddress.Create(command.IpAddress);
-        await LogSecurityEvent(
+        await LogAuditEvent(
             SecurityEventType.LoginSucceeded,
             AuditSeverity.Info,
-            now,
-            user.Id,
-            tenantId,
+            now, user.Id, tenantId,
             auditIpResult.IsSuccess ? auditIpResult.Value : null,
             command.UserAgent,
-            auditLogRepository,
-            cancellationToken);
+            auditLogRepository, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result<LoginResponse>.Success(new LoginResponse(
-            AccessToken: accessToken,
-            RefreshToken: rawRefreshToken,
+            AccessToken: issuanceResult.Value.AccessToken,
+            RefreshToken: issuanceResult.Value.RawRefreshToken,
             Result: LoginResult.Success,
             RequiresMfa: false,
             UserId: user.Id));
@@ -313,7 +210,7 @@ public sealed class LoginCommandHandler(
                 command.Country, command.Browser, command.OperatingSystem);
     }
 
-    private static async Task LogSecurityEvent(
+    private static async Task LogAuditEvent(
         SecurityEventType eventType,
         AuditSeverity severity,
         DateTime occurredAt,
@@ -324,14 +221,8 @@ public sealed class LoginCommandHandler(
         IAuditLogRepository auditLogRepository,
         CancellationToken cancellationToken)
     {
-        var logResult = AuditLog.Create(
-            eventType,
-            severity,
-            occurredAt,
-            userId: userId,
-            tenantId: tenantId,
-            ipAddress: ip,
-            userAgent: userAgent);
+        var logResult = AuditLog.Create(eventType, severity, occurredAt,
+            userId: userId, tenantId: tenantId, ipAddress: ip, userAgent: userAgent);
 
         if (logResult.IsSuccess)
             await auditLogRepository.AddAsync(logResult.Value, cancellationToken);

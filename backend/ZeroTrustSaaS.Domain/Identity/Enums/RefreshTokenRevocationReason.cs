@@ -7,5 +7,6 @@ public enum RefreshTokenRevocationReason
     SecurityStampRotated,
     AdminRevoked,
     ReplayAttack,
-    SuspiciousActivity
+    SuspiciousActivity,
+    SessionRevoked,
 }

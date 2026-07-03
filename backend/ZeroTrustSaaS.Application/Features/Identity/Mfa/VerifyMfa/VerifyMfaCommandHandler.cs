@@ -4,7 +4,6 @@ using ZeroTrustSaaS.Application.Abstractions.Services;
 using ZeroTrustSaaS.Application.Features.Identity.Login;
 using ZeroTrustSaaS.Application.Features.Identity.Mfa.VerifyAndEnableMfa;
 using ZeroTrustSaaS.Domain.Audit;
-using ZeroTrustSaaS.Domain.Authorization;
 using ZeroTrustSaaS.Domain.Common;
 using ZeroTrustSaaS.Domain.Devices;
 using ZeroTrustSaaS.Domain.Devices.Errors;
@@ -13,7 +12,6 @@ using ZeroTrustSaaS.Domain.Identity.Enums;
 using ZeroTrustSaaS.Domain.Identity.Errors;
 using ZeroTrustSaaS.Domain.Security;
 using ZeroTrustSaaS.Domain.Security.Enums;
-using DomainRefreshToken = ZeroTrustSaaS.Domain.Identity.RefreshToken;
 
 namespace ZeroTrustSaaS.Application.Features.Identity.Mfa.VerifyMfa;
 
@@ -21,16 +19,13 @@ public sealed class VerifyMfaCommandHandler(
     IUserRepository userRepository,
     ITenantRepository tenantRepository,
     ITenantMembershipRepository membershipRepository,
-    IRoleRepository roleRepository,
     ITrustedDeviceRepository trustedDeviceRepository,
     IAuditLogRepository auditLogRepository,
     IMfaCodeValidator mfaCodeValidator,
-    ITokenGenerator tokenGenerator,
+    ITokenIssuanceService tokenIssuanceService,
     IDateTimeProvider dateTimeProvider,
     IUnitOfWork unitOfWork)
 {
-    private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(30);
-
     public async Task<Result<LoginResponse>> Handle(
         VerifyMfaCommand command,
         CancellationToken cancellationToken = default)
@@ -84,11 +79,12 @@ public sealed class VerifyMfaCommandHandler(
 
         if (!isCodeValid)
         {
+            var now2 = dateTimeProvider.UtcNow;
             var auditIpResult = IpAddress.Create(command.IpAddress);
             var logResult = AuditLog.Create(
                 SecurityEventType.MfaFailed,
                 AuditSeverity.Warning,
-                dateTimeProvider.UtcNow,
+                now2,
                 userId: user.Id,
                 tenantId: tenantId,
                 ipAddress: auditIpResult.IsSuccess ? auditIpResult.Value : null,
@@ -101,18 +97,9 @@ public sealed class VerifyMfaCommandHandler(
             return Result<LoginResponse>.Failure(UserErrors.InvalidMfaCode);
         }
 
-        return await IssueTokensAsync(user, command, tenantId, cancellationToken);
-    }
-
-    private async Task<Result<LoginResponse>> IssueTokensAsync(
-        User user,
-        VerifyMfaCommand command,
-        Guid? tenantId,
-        CancellationToken cancellationToken)
-    {
         var now = dateTimeProvider.UtcNow;
 
-        // Resolve the device associated with this MFA verification.
+        // Resolve device: trust it if requested.
         Guid? deviceId = null;
         var fp = DeviceFingerprint.Create(command.DeviceFingerprint);
         if (fp.IsSuccess)
@@ -137,13 +124,6 @@ public sealed class VerifyMfaCommandHandler(
             }
         }
 
-        string rawRefreshToken = tokenGenerator.GenerateRefreshTokenValue();
-        string hashedToken = tokenGenerator.HashRefreshToken(rawRefreshToken);
-
-        var tokenHashResult = RefreshTokenHash.Create(hashedToken);
-        if (tokenHashResult.IsFailure)
-            return Result<LoginResponse>.Failure(tokenHashResult.Error);
-
         var ip = IpAddress.Create(command.IpAddress);
         var clientInfoResult = ClientInfo.Create(
             fp.IsSuccess ? fp.Value : DeviceFingerprint.From("unknown"),
@@ -157,88 +137,17 @@ public sealed class VerifyMfaCommandHandler(
             : ClientInfo.From(DeviceFingerprint.From("unknown"), IpAddress.Empty(),
                 command.Country, command.Browser, command.OperatingSystem);
 
-        var refreshTokenResult = DomainRefreshToken.Create(
-            user.Id,
-            tokenHashResult.Value,
-            clientInfo,
-            now,
-            now.Add(RefreshTokenLifetime),
-            tenantId,
-            trustedDeviceId: deviceId);
+        var issuanceResult = await tokenIssuanceService.IssueAsync(
+            user, tenantId, deviceId, clientInfo, command.UserAgent, now, cancellationToken);
 
-        if (refreshTokenResult.IsFailure)
-            return Result<LoginResponse>.Failure(refreshTokenResult.Error);
-
-        var issueResult = user.IssueRefreshToken(refreshTokenResult.Value, now);
-        if (issueResult.IsFailure)
-            return Result<LoginResponse>.Failure(issueResult.Error);
+        if (issuanceResult.IsFailure)
+            return Result<LoginResponse>.Failure(issuanceResult.Error);
 
         var attemptResult = LoginAttempt.Create(
-            user.Id,
-            clientInfo,
-            LoginResult.Success,
-            RiskLevel.Low,
-            now);
+            user.Id, clientInfo, LoginResult.Success, RiskLevel.Low, now);
 
         if (attemptResult.IsSuccess)
             user.RecordSuccessfulLogin(attemptResult.Value, now);
-
-        var sessionId = refreshTokenResult.Value.Id;
-
-        string accessToken;
-
-        if (tenantId is null)
-        {
-            var userRoles = await roleRepository.GetUserRolesAsync(user.Id, null, cancellationToken);
-            var platformRoleNames = new List<string>();
-
-            foreach (var ur in userRoles.Where(r => r.IsActive))
-            {
-                var role = await roleRepository.GetByIdAsync(ur.RoleId, cancellationToken);
-                if (role is not null)
-                    platformRoleNames.Add(role.Name.Value);
-            }
-
-            accessToken = tokenGenerator.GenerateJwtToken(
-                user.Id,
-                user.Email.Value,
-                user.SecurityStamp.Value.ToString(),
-                platformRoleNames,
-                tenantId: null,
-                tenantRole: null,
-                permissions: [],
-                sessionId: sessionId,
-                deviceId: deviceId);
-        }
-        else
-        {
-            var userRoles = await roleRepository.GetUserRolesAsync(user.Id, tenantId, cancellationToken);
-            var activeUserRole = userRoles.FirstOrDefault(ur => ur.IsActive);
-
-            string tenantRoleName = string.Empty;
-            var permissionCodes = new List<string>();
-
-            if (activeUserRole is not null)
-            {
-                var role = await roleRepository.GetByIdAsync(activeUserRole.RoleId, cancellationToken);
-                if (role is not null)
-                {
-                    tenantRoleName = role.Name.Value;
-                    permissionCodes.AddRange(role.Permissions.Select(p => p.Code.Value));
-                }
-            }
-
-            accessToken = tokenGenerator.GenerateJwtToken(
-                user.Id,
-                user.Email.Value,
-                user.SecurityStamp.Value.ToString(),
-                platformRoles: [],
-                tenantId: tenantId,
-                tenantRole: tenantRoleName,
-                permissions: permissionCodes,
-                sessionId: sessionId,
-                deviceId: deviceId);
-        }
 
         userRepository.Update(user);
 
@@ -258,8 +167,8 @@ public sealed class VerifyMfaCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result<LoginResponse>.Success(new LoginResponse(
-            AccessToken: accessToken,
-            RefreshToken: rawRefreshToken,
+            AccessToken: issuanceResult.Value.AccessToken,
+            RefreshToken: issuanceResult.Value.RawRefreshToken,
             Result: LoginResult.Success,
             RequiresMfa: false,
             UserId: user.Id));

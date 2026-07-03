@@ -7,7 +7,7 @@ namespace ZeroTrustSaaS.Infrastructure.Services;
 
 internal sealed class SessionStatusCache(
     IMemoryCache cache,
-    IRefreshTokenRepository refreshTokenRepository,
+    ISessionRepository sessionRepository,
     ILogger<SessionStatusCache> logger)
     : ISessionStatusCache
 {
@@ -23,31 +23,27 @@ internal sealed class SessionStatusCache(
             return cached;
         }
 
-        var token = await refreshTokenRepository.GetByIdAsync(sessionId, ct);
+        var session = await sessionRepository.GetByIdAsync(sessionId, ct);
 
-        if (token is null)
+        if (session is null)
         {
             logger.LogWarning(
-                "[SessionCache] MISS  session={SessionId}  token=NOT_FOUND → active=false",
+                "[SessionCache] MISS  session={SessionId}  session=NOT_FOUND → active=false",
                 sessionId);
             cache.Set(Key(sessionId), false, TimeSpan.FromMinutes(5));
             return false;
         }
 
-        bool isActive = token.IsActive;
+        bool isActive = session.IsActive;
 
         logger.LogDebug(
-            "[SessionCache] MISS  session={SessionId}  token_id={TokenId}  " +
-            "is_active={IsActive}  is_used={IsUsed}  is_revoked={IsRevoked}  " +
-            "used_at={UsedAtUtc}  revoked_at={RevokedAtUtc}  expires_at={ExpiresAtUtc}",
+            "[SessionCache] MISS  session={SessionId}  status={Status}  " +
+            "is_active={IsActive}  expires_at={ExpiresAtUtc}  revoked_at={RevokedAtUtc}",
             sessionId,
-            token.Id,
+            session.Status,
             isActive,
-            token.IsUsed,
-            token.IsRevoked,
-            token.UsedAtUtc?.ToString("O"),
-            token.RevokedAtUtc?.ToString("O"),
-            token.ExpiresAtUtc.ToString("O"));
+            session.ExpiresAtUtc.ToString("O"),
+            session.RevokedAtUtc?.ToString("O"));
 
         cache.Set(Key(sessionId), isActive, TimeSpan.FromMinutes(5));
         return isActive;

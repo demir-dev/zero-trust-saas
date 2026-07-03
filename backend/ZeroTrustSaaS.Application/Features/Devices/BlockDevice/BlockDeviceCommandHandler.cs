@@ -5,12 +5,14 @@ using ZeroTrustSaaS.Domain.Audit;
 using ZeroTrustSaaS.Domain.Common;
 using ZeroTrustSaaS.Domain.Devices.Errors;
 using ZeroTrustSaaS.Domain.Security;
+using ZeroTrustSaaS.Domain.Sessions;
 
 namespace ZeroTrustSaaS.Application.Features.Devices.BlockDevice;
 
 public sealed class BlockDeviceCommandHandler(
     ITrustedDeviceRepository deviceRepository,
-    IUserRepository userRepository,
+    ISessionRepository sessionRepository,
+    IRefreshTokenRepository refreshTokenRepository,
     IAuditLogRepository auditLogRepository,
     IDateTimeProvider dateTimeProvider,
     ISessionStatusCache sessionStatusCache,
@@ -27,7 +29,6 @@ public sealed class BlockDeviceCommandHandler(
             return Result.Failure(TrustedDeviceErrors.NotFound);
 
         var result = device.Block();
-
         if (result.IsFailure)
             return result;
 
@@ -36,18 +37,13 @@ public sealed class BlockDeviceCommandHandler(
         var now = dateTimeProvider.UtcNow;
 
         // Revoke only sessions that belong to this device; leave other devices' sessions alive.
-        var user = await userRepository.GetByIdWithTokensAsync(device.UserId, cancellationToken);
-        if (user is not null)
+        var deviceSessions = await sessionRepository.GetActiveByDeviceIdAsync(device.Id, cancellationToken);
+
+        foreach (var session in deviceSessions)
         {
-            var deviceSessions = user.RefreshTokens
-                .Where(rt => rt.TrustedDeviceId == device.Id && rt.IsActive)
-                .ToList();
-
-            foreach (var session in deviceSessions)
-                user.RevokeRefreshToken(session.Id, now);
-
-            if (deviceSessions.Count > 0)
-                userRepository.Update(user);
+            session.Revoke(now, SessionRevocationReason.DeviceBlocked);
+            sessionRepository.Update(session);
+            await refreshTokenRepository.RevokeAllBySessionIdAsync(session.Id, now, cancellationToken);
         }
 
         var logResult = AuditLog.Create(
@@ -62,12 +58,8 @@ public sealed class BlockDeviceCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // Invalidate each revoked session and the device status so in-flight JWTs are rejected immediately.
-        if (user is not null)
-        {
-            foreach (var session in user.RefreshTokens.Where(rt => rt.TrustedDeviceId == device.Id))
-                sessionStatusCache.Invalidate(session.Id);
-        }
+        foreach (var session in deviceSessions)
+            sessionStatusCache.Invalidate(session.Id);
 
         deviceStatusCache.Invalidate(device.Id);
 

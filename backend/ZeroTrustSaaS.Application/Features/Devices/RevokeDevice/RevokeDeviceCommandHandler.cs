@@ -5,12 +5,14 @@ using ZeroTrustSaaS.Domain.Audit;
 using ZeroTrustSaaS.Domain.Common;
 using ZeroTrustSaaS.Domain.Devices.Errors;
 using ZeroTrustSaaS.Domain.Security;
+using ZeroTrustSaaS.Domain.Sessions;
 
 namespace ZeroTrustSaaS.Application.Features.Devices.RevokeDevice;
 
 public sealed class RevokeDeviceCommandHandler(
     ITrustedDeviceRepository deviceRepository,
-    IUserRepository userRepository,
+    ISessionRepository sessionRepository,
+    IRefreshTokenRepository refreshTokenRepository,
     IAuditLogRepository auditLogRepository,
     ISessionStatusCache sessionStatusCache,
     IDeviceStatusCache deviceStatusCache,
@@ -28,25 +30,19 @@ public sealed class RevokeDeviceCommandHandler(
 
         var now = dateTimeProvider.UtcNow;
         var result = device.Revoke(now);
-
         if (result.IsFailure)
             return result;
 
         deviceRepository.Update(device);
 
         // Revoke only sessions belonging to this device; leave other devices' sessions alive.
-        var user = await userRepository.GetByIdWithTokensAsync(device.UserId, cancellationToken);
-        if (user is not null)
+        var deviceSessions = await sessionRepository.GetActiveByDeviceIdAsync(device.Id, cancellationToken);
+
+        foreach (var session in deviceSessions)
         {
-            var deviceSessions = user.RefreshTokens
-                .Where(rt => rt.TrustedDeviceId == device.Id && rt.IsActive)
-                .ToList();
-
-            foreach (var session in deviceSessions)
-                user.RevokeRefreshToken(session.Id, now);
-
-            if (deviceSessions.Count > 0)
-                userRepository.Update(user);
+            session.Revoke(now, SessionRevocationReason.DeviceRevoked);
+            sessionRepository.Update(session);
+            await refreshTokenRepository.RevokeAllBySessionIdAsync(session.Id, now, cancellationToken);
         }
 
         var logResult = AuditLog.Create(
@@ -61,11 +57,8 @@ public sealed class RevokeDeviceCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        if (user is not null)
-        {
-            foreach (var session in user.RefreshTokens.Where(rt => rt.TrustedDeviceId == device.Id))
-                sessionStatusCache.Invalidate(session.Id);
-        }
+        foreach (var session in deviceSessions)
+            sessionStatusCache.Invalidate(session.Id);
 
         deviceStatusCache.Invalidate(device.Id);
 

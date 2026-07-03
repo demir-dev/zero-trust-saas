@@ -8,12 +8,10 @@ namespace ZeroTrustSaaS.Domain.Identity;
 
 public sealed class User : SecureAggregateRoot
 {
-    private const int MaxActiveRefreshTokens = 5;
     private const int MaxFailedLoginAttemptsBeforeLockout = 5;
     private static readonly TimeSpan DefaultLockoutDuration = TimeSpan.FromMinutes(15);
 
     private readonly List<LoginAttempt> _loginAttempts = [];
-    private readonly List<RefreshToken> _refreshTokens = [];
     private List<string> _mfaRecoveryCodes = [];
 
     private User()
@@ -83,8 +81,6 @@ public sealed class User : SecureAggregateRoot
 
     public IReadOnlyCollection<LoginAttempt> LoginAttempts => _loginAttempts.AsReadOnly();
 
-    public IReadOnlyCollection<RefreshToken> RefreshTokens => _refreshTokens.AsReadOnly();
-
     public bool IsActive => Status == UserStatus.Active;
 
     public bool IsLocked =>
@@ -131,9 +127,7 @@ public sealed class User : SecureAggregateRoot
         return Result.Success();
     }
 
-    public Result ChangeEmail(
-        Email email,
-        DateTime changedAtUtc)
+    public Result ChangeEmail(Email email, DateTime changedAtUtc)
     {
         if (Status is UserStatus.Disabled or UserStatus.Suspended)
             return Result.Failure(UserErrors.UserNotAllowedToChangeEmail);
@@ -146,15 +140,12 @@ public sealed class User : SecureAggregateRoot
         EmailVerifiedAtUtc = null;
         Status = UserStatus.PendingVerification;
 
-        RevokeAllRefreshTokens(changedAtUtc);
         RefreshSecurityStamp();
 
         return Result.Success();
     }
 
-    public Result ChangePassword(
-        PasswordHash passwordHash,
-        DateTime changedAtUtc)
+    public Result ChangePassword(PasswordHash passwordHash, DateTime changedAtUtc)
     {
         if (Status is UserStatus.Disabled or UserStatus.Suspended)
             return Result.Failure(UserErrors.UserNotAllowedToChangePassword);
@@ -162,16 +153,12 @@ public sealed class User : SecureAggregateRoot
         PasswordHash = passwordHash;
         PasswordChangedAtUtc = changedAtUtc;
 
-        RevokeAllRefreshTokens(changedAtUtc);
         RefreshSecurityStamp();
 
         return Result.Success();
     }
 
-    public Result EnableMfa(
-        MfaMethod method,
-        MfaSecret secret,
-        DateTime enabledAtUtc)
+    public Result EnableMfa(MfaMethod method, MfaSecret secret, DateTime enabledAtUtc)
     {
         if (Status != UserStatus.Active)
             return Result.Failure(UserErrors.UserMustBeActive);
@@ -186,7 +173,6 @@ public sealed class User : SecureAggregateRoot
         MfaMethod = method;
         MfaSecret = secret;
 
-        RevokeAllRefreshTokens(enabledAtUtc);
         RefreshSecurityStamp();
 
         return Result.Success();
@@ -205,7 +191,6 @@ public sealed class User : SecureAggregateRoot
         MfaSecret = null;
         _mfaRecoveryCodes.Clear();
 
-        RevokeAllRefreshTokens(disabledAtUtc);
         RefreshSecurityStamp();
 
         return Result.Success();
@@ -221,9 +206,7 @@ public sealed class User : SecureAggregateRoot
         return _mfaRecoveryCodes.Remove(hash);
     }
 
-    public Result LockUntil(
-        DateTime lockedUntilUtc,
-        DateTime lockedAtUtc)
+    public Result LockUntil(DateTime lockedUntilUtc, DateTime lockedAtUtc)
     {
         if (Status is UserStatus.Disabled or UserStatus.Suspended)
             return Result.Failure(UserErrors.UserCannotBeLocked);
@@ -234,7 +217,6 @@ public sealed class User : SecureAggregateRoot
         Status = UserStatus.Locked;
         LockedUntilUtc = lockedUntilUtc;
 
-        RevokeAllRefreshTokens(lockedAtUtc);
         RefreshSecurityStamp();
 
         return Result.Success();
@@ -248,7 +230,6 @@ public sealed class User : SecureAggregateRoot
         Status = UserStatus.Active;
         LockedUntilUtc = null;
 
-        RevokeAllRefreshTokens(unlockedAtUtc);
         RefreshSecurityStamp();
 
         return Result.Success();
@@ -265,7 +246,6 @@ public sealed class User : SecureAggregateRoot
         Status = UserStatus.Suspended;
         LockedUntilUtc = null;
 
-        RevokeAllRefreshTokens(suspendedAtUtc);
         RefreshSecurityStamp();
 
         return Result.Success();
@@ -282,7 +262,6 @@ public sealed class User : SecureAggregateRoot
 
         LockedUntilUtc = null;
 
-        RevokeAllRefreshTokens(resumedAtUtc);
         RefreshSecurityStamp();
 
         return Result.Success();
@@ -296,7 +275,6 @@ public sealed class User : SecureAggregateRoot
         Status = UserStatus.Disabled;
         LockedUntilUtc = null;
 
-        RevokeAllRefreshTokens(disabledAtUtc);
         RefreshSecurityStamp();
 
         return Result.Success();
@@ -313,15 +291,12 @@ public sealed class User : SecureAggregateRoot
 
         LockedUntilUtc = null;
 
-        RevokeAllRefreshTokens(reactivatedAtUtc);
         RefreshSecurityStamp();
 
         return Result.Success();
     }
 
-    public Result RecordSuccessfulLogin(
-        LoginAttempt attempt,
-        DateTime loggedInAtUtc)
+    public Result RecordSuccessfulLogin(LoginAttempt attempt, DateTime loggedInAtUtc)
     {
         if (Status != UserStatus.Active)
             return Result.Failure(UserErrors.UserMustBeActive);
@@ -337,9 +312,7 @@ public sealed class User : SecureAggregateRoot
         return Result.Success();
     }
 
-    public Result RecordFailedLogin(
-        LoginAttempt attempt,
-        DateTime failedAtUtc)
+    public Result RecordFailedLogin(LoginAttempt attempt, DateTime failedAtUtc)
     {
         if (Status is UserStatus.Disabled or UserStatus.Suspended)
             return Result.Failure(UserErrors.LoginNotAllowed);
@@ -357,50 +330,11 @@ public sealed class User : SecureAggregateRoot
         return Result.Success();
     }
 
-    public Result IssueRefreshToken(
-        RefreshToken refreshToken,
-        DateTime issuedAtUtc)
-    {
-        if (Status != UserStatus.Active)
-            return Result.Failure(UserErrors.UserMustBeActive);
-
-        if (IsLocked)
-            return Result.Failure(UserErrors.UserIsLocked);
-
-        _refreshTokens.Add(refreshToken);
-
-        EnforceRefreshTokenLimit(issuedAtUtc);
-
-        return Result.Success();
-    }
-
-    public Result RevokeRefreshToken(
-        Guid tokenId,
-        DateTime revokedAtUtc)
-    {
-        var token = _refreshTokens.FirstOrDefault(x => x.Id == tokenId);
-
-        if (token is null)
-            return Result.Failure(UserErrors.RefreshTokenNotFound);
-
-        token.Revoke(revokedAtUtc, RefreshTokenRevocationReason.UserLogout);
-
-        return Result.Success();
-    }
-
+    // Rotates the security stamp, immediately invalidating all issued JWTs via the stamp check.
+    // Bulk session revocation is handled separately by handlers via ISessionRepository.
     public Result RevokeAllUserRefreshTokens(DateTime revokedAtUtc)
     {
-        RevokeAllRefreshTokens(revokedAtUtc);
         RefreshSecurityStamp();
-
-        return Result.Success();
-    }
-
-    public Result RotateSecurityStamp(DateTime rotatedAtUtc)
-    {
-        RevokeAllRefreshTokens(rotatedAtUtc);
-        RefreshSecurityStamp();
-
         return Result.Success();
     }
 
@@ -413,27 +347,6 @@ public sealed class User : SecureAggregateRoot
             .Count();
 
         return recentFailedAttempts >= MaxFailedLoginAttemptsBeforeLockout;
-    }
-
-    private void EnforceRefreshTokenLimit(DateTime revokedAtUtc)
-    {
-        var activeRefreshTokens = _refreshTokens
-            .Where(x => !x.IsRevoked && !x.IsExpired)
-            .OrderByDescending(x => x.IssuedAtUtc)
-            .ToList();
-
-        foreach (var token in activeRefreshTokens.Skip(MaxActiveRefreshTokens))
-        {
-            token.Revoke(revokedAtUtc, RefreshTokenRevocationReason.SecurityStampRotated);
-        }
-    }
-
-    private void RevokeAllRefreshTokens(DateTime revokedAtUtc)
-    {
-        foreach (var token in _refreshTokens.Where(x => !x.IsRevoked))
-        {
-            token.Revoke(revokedAtUtc, RefreshTokenRevocationReason.SecurityStampRotated);
-        }
     }
 
     private void RefreshSecurityStamp()

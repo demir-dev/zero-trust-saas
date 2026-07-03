@@ -1,5 +1,3 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -7,7 +5,6 @@ using ZeroTrustSaaS.Api.Endpoints;
 using ZeroTrustSaaS.Api.Services;
 using ZeroTrustSaaS.Application;
 using ZeroTrustSaaS.Application.Abstractions.Services;
-using ZeroTrustSaaS.Domain.Devices;
 using Microsoft.EntityFrameworkCore;
 using ZeroTrustSaaS.Infrastructure;
 using ZeroTrustSaaS.Infrastructure.Persistence;
@@ -41,105 +38,23 @@ builder.Services
             ValidAudience = jwtSettings.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
+            NameClaimType = "sub",
         };
+        options.MapInboundClaims = false;
 
         options.Events = new JwtBearerEvents
         {
             OnTokenValidated = async context =>
             {
-                var log = context.HttpContext.RequestServices
-                    .GetRequiredService<ILoggerFactory>()
-                    .CreateLogger("ZeroTrustSaaS.Auth.OnTokenValidated");
+                var service = context.HttpContext.RequestServices
+                    .GetRequiredService<ISessionValidationService>();
 
-                var path   = context.HttpContext.Request.Path;
-                var method = context.HttpContext.Request.Method;
+                var result = await service.ValidateAsync(
+                    context.Principal!,
+                    context.HttpContext.RequestAborted);
 
-                var userIdClaim = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Sub);
-                var stampClaim  = context.Principal?.FindFirstValue("security_stamp");
-                var sessionIdClaim = context.Principal?.FindFirstValue("session_id");
-
-                log.LogInformation(
-                    "[OnTokenValidated] ENTER  {Method} {Path}  user={UserId}  session={SessionId}",
-                    method, path, userIdClaim ?? "(none)", sessionIdClaim ?? "(none)");
-
-                if (userIdClaim is null || stampClaim is null
-                    || !Guid.TryParse(userIdClaim, out var userId))
-                {
-                    log.LogWarning("[OnTokenValidated] FAIL missing sub/stamp claims");
-                    return;
-                }
-
-                var stampCache = context.HttpContext.RequestServices
-                    .GetRequiredService<ISecurityStampCache>();
-
-                var currentStamp = await stampCache.GetOrFetchStampAsync(
-                    userId, context.HttpContext.RequestAborted);
-
-                if (currentStamp is null || currentStamp != stampClaim)
-                {
-                    log.LogWarning(
-                        "[OnTokenValidated] REJECT stamp_mismatch  user={UserId}  " +
-                        "jwt_stamp={JwtStamp}  db_stamp={DbStamp}",
-                        userId, stampClaim, currentStamp ?? "(null)");
-                    context.Fail("Security stamp mismatch.");
-                    return;
-                }
-
-                log.LogDebug("[OnTokenValidated] stamp OK  user={UserId}", userId);
-
-                var tenantIdClaim = context.Principal?.FindFirstValue("tenant_id");
-                if (tenantIdClaim is not null && Guid.TryParse(tenantIdClaim, out var tenantId))
-                {
-                    var tenantStatusCache = context.HttpContext.RequestServices
-                        .GetRequiredService<ITenantStatusCache>();
-                    if (!await tenantStatusCache.IsActiveAsync(tenantId, context.HttpContext.RequestAborted))
-                    {
-                        log.LogWarning("[OnTokenValidated] REJECT tenant_suspended  tenant={TenantId}", tenantId);
-                        context.Fail("Tenant is suspended.");
-                        return;
-                    }
-                    log.LogDebug("[OnTokenValidated] tenant OK  tenant={TenantId}", tenantId);
-                }
-
-                if (sessionIdClaim is not null && Guid.TryParse(sessionIdClaim, out var sessionId))
-                {
-                    var sessionCache = context.HttpContext.RequestServices
-                        .GetRequiredService<ISessionStatusCache>();
-                    bool active = await sessionCache.IsActiveAsync(sessionId, context.HttpContext.RequestAborted);
-                    log.LogDebug(
-                        "[OnTokenValidated] session check  session={SessionId}  active={Active}",
-                        sessionId, active);
-                    if (!active)
-                    {
-                        log.LogWarning("[OnTokenValidated] REJECT session_revoked  session={SessionId}", sessionId);
-                        context.Fail("Session has been revoked.");
-                        return;
-                    }
-                }
-                else
-                {
-                    log.LogDebug("[OnTokenValidated] no session_id claim — skipping session check");
-                }
-
-                var deviceIdClaim = context.Principal?.FindFirstValue("device_id");
-                if (deviceIdClaim is not null && Guid.TryParse(deviceIdClaim, out var deviceId))
-                {
-                    var deviceCache = context.HttpContext.RequestServices
-                        .GetRequiredService<IDeviceStatusCache>();
-                    var deviceStatus = await deviceCache.GetStatusAsync(deviceId, context.HttpContext.RequestAborted);
-                    if (deviceStatus is DeviceStatus.Blocked or DeviceStatus.Revoked)
-                    {
-                        log.LogWarning(
-                            "[OnTokenValidated] REJECT device_blocked  device={DeviceId}  status={Status}",
-                            deviceId, deviceStatus);
-                        context.Fail("Device is blocked or revoked.");
-                        return;
-                    }
-                }
-
-                log.LogInformation(
-                    "[OnTokenValidated] PASS  {Method} {Path}  user={UserId}  session={SessionId}",
-                    method, path, userId, sessionIdClaim ?? "(none)");
+                if (!result.IsValid)
+                    context.Fail(result.FailureReason ?? "Authentication failed.");
             }
         };
     });
