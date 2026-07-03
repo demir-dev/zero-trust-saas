@@ -8,6 +8,7 @@ using ZeroTrustSaaS.Domain.Identity;
 using ZeroTrustSaaS.Domain.Identity.Enums;
 using ZeroTrustSaaS.Domain.Identity.Errors;
 using ZeroTrustSaaS.Domain.Security;
+using ZeroTrustSaaS.Domain.Sessions;
 using ZeroTrustSaaS.Domain.Tenants.Errors;
 
 namespace ZeroTrustSaaS.Application.Features.Identity.RefreshToken;
@@ -15,6 +16,7 @@ namespace ZeroTrustSaaS.Application.Features.Identity.RefreshToken;
 public sealed class RefreshTokenCommandHandler(
     IUserRepository userRepository,
     IRefreshTokenRepository refreshTokenRepository,
+    ISessionRepository sessionRepository,
     IRoleRepository roleRepository,
     IAuditLogRepository auditLogRepository,
     ITokenGenerator tokenGenerator,
@@ -31,56 +33,49 @@ public sealed class RefreshTokenCommandHandler(
         CancellationToken cancellationToken = default)
     {
         string hashedInput = tokenGenerator.HashRefreshToken(command.RefreshToken);
-
         var existingToken = await refreshTokenRepository.GetByHashAsync(hashedInput, cancellationToken);
 
         if (existingToken is null)
             return Result<RefreshTokenResponse>.Failure(UserErrors.RefreshTokenNotFound);
 
+        var now = dateTimeProvider.UtcNow;
+
         if (!existingToken.IsActive)
         {
-            if (existingToken.IsRevoked)
+            if (existingToken.IsRevoked || existingToken.IsUsed)
             {
-                // Revoked token presented — potential token theft; kill all sessions.
-                var attackedUser = await userRepository.GetByIdWithTokensAsync(existingToken.UserId, cancellationToken);
-
-                if (attackedUser is not null)
+                // Presented a consumed/revoked token — replay attack.
+                // Revoke the entire session and all its tokens.
+                var session2 = await sessionRepository.GetByIdAsync(existingToken.SessionId, cancellationToken);
+                if (session2 is not null && !session2.IsRevoked)
                 {
-                    var now2 = dateTimeProvider.UtcNow;
-                    attackedUser.RevokeAllUserRefreshTokens(now2);
-                    userRepository.Update(attackedUser);
-                    await unitOfWork.SaveChangesAsync(cancellationToken);
+                    session2.Revoke(now, SessionRevocationReason.ReplayAttack);
+                    sessionRepository.Update(session2);
                 }
 
-                return Result<RefreshTokenResponse>.Failure(UserErrors.RefreshTokenAlreadyRevoked);
-            }
+                await refreshTokenRepository.RevokeAllBySessionIdAsync(existingToken.SessionId, now, cancellationToken);
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+                sessionStatusCache.Invalidate(existingToken.SessionId);
 
-            if (existingToken.IsUsed)
-            {
-                // Already-rotated token presented — replay attack; kill all sessions.
-                var attackedUser = await userRepository.GetByIdWithTokensAsync(existingToken.UserId, cancellationToken);
-
-                if (attackedUser is not null)
-                {
-                    var now2 = dateTimeProvider.UtcNow;
-                    attackedUser.RevokeAllUserRefreshTokens(now2);
-                    userRepository.Update(attackedUser);
-                    await unitOfWork.SaveChangesAsync(cancellationToken);
-                }
-
-                return Result<RefreshTokenResponse>.Failure(RefreshTokenErrors.AlreadyUsed);
+                var error = existingToken.IsRevoked
+                    ? UserErrors.RefreshTokenAlreadyRevoked
+                    : RefreshTokenErrors.AlreadyUsed;
+                return Result<RefreshTokenResponse>.Failure(error);
             }
 
             if (existingToken.IsExpired)
                 return Result<RefreshTokenResponse>.Failure(UserErrors.RefreshTokenExpired);
         }
 
-        var activeUser = await userRepository.GetByIdAsync(existingToken.UserId, cancellationToken);
+        // Load the session — this is now the stable identity that stays through rotations.
+        var session = await sessionRepository.GetByIdAsync(existingToken.SessionId, cancellationToken);
+        if (session is null || !session.IsActive)
+            return Result<RefreshTokenResponse>.Failure(UserErrors.RefreshTokenNotFound);
 
+        var activeUser = await userRepository.GetByIdAsync(existingToken.UserId, cancellationToken);
         if (activeUser is null || !activeUser.CanAuthenticate)
             return Result<RefreshTokenResponse>.Failure(UserErrors.LoginNotAllowed);
 
-        // Refuse refresh if the token's device is blocked or revoked.
         if (existingToken.TrustedDeviceId.HasValue)
         {
             var deviceStatus = await deviceStatusCache.GetStatusAsync(
@@ -89,7 +84,6 @@ public sealed class RefreshTokenCommandHandler(
                 return Result<RefreshTokenResponse>.Failure(Domain.Devices.Errors.TrustedDeviceErrors.DeviceBlocked);
         }
 
-        // Re-issue with same tenant context (null = platform, set = tenant).
         var tenantId = existingToken.TenantId;
 
         if (tenantId is not null &&
@@ -114,8 +108,7 @@ public sealed class RefreshTokenCommandHandler(
                 command.Browser,
                 command.OperatingSystem);
 
-        var now = dateTimeProvider.UtcNow;
-
+        // Rotate the refresh token — session.Id remains the stable session identity.
         string newRawToken = tokenGenerator.GenerateRefreshTokenValue();
         string newHashedToken = tokenGenerator.HashRefreshToken(newRawToken);
 
@@ -123,9 +116,9 @@ public sealed class RefreshTokenCommandHandler(
         if (newTokenHashResult.IsFailure)
             return Result<RefreshTokenResponse>.Failure(newTokenHashResult.Error);
 
-        // Carry the device association forward through the rotation chain.
         var newRefreshTokenResult = Domain.Identity.RefreshToken.Create(
             activeUser.Id,
+            session.Id,
             newTokenHashResult.Value,
             clientInfo,
             now,
@@ -140,14 +133,17 @@ public sealed class RefreshTokenCommandHandler(
         if (rotateResult.IsFailure)
             return Result<RefreshTokenResponse>.Failure(rotateResult.Error);
 
-        var issueResult = activeUser.IssueRefreshToken(newRefreshTokenResult.Value, now);
-        if (issueResult.IsFailure)
-            return Result<RefreshTokenResponse>.Failure(issueResult.Error);
+        // Update session activity — same session persists through the rotation.
+        session.UpdateActivity(
+            now,
+            ipResult.IsSuccess ? ipResult.Value.Value : null,
+            command.Browser,
+            command.OperatingSystem,
+            command.Country);
 
-        var newSessionId = newRefreshTokenResult.Value.Id;
         var deviceId = existingToken.TrustedDeviceId;
 
-        // Re-build JWT claims matching the same context as the original token.
+        // Re-build JWT claims — session_id = session.Id (stable, not the new RT id).
         string accessToken;
 
         if (tenantId is null)
@@ -170,7 +166,7 @@ public sealed class RefreshTokenCommandHandler(
                 tenantId: null,
                 tenantRole: null,
                 permissions: [],
-                sessionId: newSessionId,
+                sessionId: session.Id,
                 deviceId: deviceId);
         }
         else
@@ -199,15 +195,16 @@ public sealed class RefreshTokenCommandHandler(
                 tenantId: tenantId,
                 tenantRole: tenantRoleName,
                 permissions: permissionCodes,
-                sessionId: newSessionId,
+                sessionId: session.Id,
                 deviceId: deviceId);
         }
 
         refreshTokenRepository.Update(existingToken);
-        userRepository.Update(activeUser);
+        await refreshTokenRepository.AddAsync(newRefreshTokenResult.Value, cancellationToken);
+        sessionRepository.Update(session);
 
         var logResult = AuditLog.Create(
-            SecurityEventType.RefreshTokenRotated,
+            SecurityEventType.SessionRefreshed,
             AuditSeverity.Info,
             now,
             userId: activeUser.Id,
@@ -219,9 +216,6 @@ public sealed class RefreshTokenCommandHandler(
             await auditLogRepository.AddAsync(logResult.Value, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-
-        // Invalidate old session immediately after commit — prevents reuse of old JWT's session_id.
-        sessionStatusCache.Invalidate(existingToken.Id);
 
         return Result<RefreshTokenResponse>.Success(new RefreshTokenResponse(
             AccessToken: accessToken,

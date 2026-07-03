@@ -4,6 +4,7 @@ using ZeroTrustSaaS.Domain.Authorization;
 using ZeroTrustSaaS.Domain.Devices;
 using ZeroTrustSaaS.Domain.Identity;
 using ZeroTrustSaaS.Domain.Platform;
+using ZeroTrustSaaS.Domain.Sessions;
 using ZeroTrustSaaS.Domain.Tenants;
 
 namespace ZeroTrustSaaS.Infrastructure.Persistence;
@@ -11,6 +12,8 @@ namespace ZeroTrustSaaS.Infrastructure.Persistence;
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
+
+    public DbSet<Session> Sessions => Set<Session>();
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 

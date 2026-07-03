@@ -104,7 +104,9 @@ export function AuthProvider({ children }) {
     const permissions = claims?.permissions ?? []
     const isPlatformUser = platformRoles.length > 0
     const hasTenantContext = !!tenantId
+    const userId = claims?.sub ?? null
     const deviceId = claims?.deviceId ?? null
+    const sessionId = claims?.sessionId ?? null
 
     const hasPermission = (code) => isPlatformUser || permissions.includes(code)
 
@@ -118,7 +120,9 @@ export function AuthProvider({ children }) {
       isAuthenticated,
       isPlatformUser,
       hasTenantContext,
+      userId,
       deviceId,
+      sessionId,
       hasPermission,
       login,
       loginWithTenant,

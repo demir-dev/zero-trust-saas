@@ -15,4 +15,14 @@ public interface IRefreshTokenRepository
     Task AddAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default);
 
     void Update(RefreshToken refreshToken);
+
+    Task RevokeAllBySessionIdAsync(
+        Guid sessionId,
+        DateTime revokedAtUtc,
+        CancellationToken cancellationToken = default);
+
+    Task RevokeAllByUserIdAsync(
+        Guid userId,
+        DateTime revokedAtUtc,
+        CancellationToken cancellationToken = default);
 }

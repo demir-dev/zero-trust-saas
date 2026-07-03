@@ -33,4 +33,12 @@ public enum SecurityEventType
     MfaFailed = 29,
     MfaSucceeded = 30,
     TrustedDeviceUnblocked = 31,
+    SessionCreated = 32,
+    SessionRevoked = 33,
+    SessionExpired = 34,
+    SessionRefreshed = 35,
+    Logout = 36,
+    LogoutAll = 37,
+    MfaBypassedTrustedDevice = 38,
+    TrustedDeviceRegistered = 39,
 }

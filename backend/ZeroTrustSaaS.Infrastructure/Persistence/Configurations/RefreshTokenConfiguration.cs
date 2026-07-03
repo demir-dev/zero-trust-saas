@@ -14,6 +14,13 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
 
         builder.Property(rt => rt.UserId).IsRequired();
 
+        builder.Property(rt => rt.SessionId)
+            .HasColumnName("session_id")
+            .IsRequired();
+
+        builder.HasIndex(rt => rt.SessionId)
+            .HasDatabaseName("ix_refresh_tokens_session_id");
+
         builder.Property(rt => rt.TenantId);
 
         builder.Property(rt => rt.TrustedDeviceId)

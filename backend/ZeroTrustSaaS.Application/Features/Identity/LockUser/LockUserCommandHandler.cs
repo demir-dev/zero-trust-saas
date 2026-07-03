@@ -30,7 +30,7 @@ public sealed class LockUserCommandHandler(
                 return Result.Failure(AuthorizationErrors.InsufficientHierarchyLevel);
         }
 
-        var user = await userRepository.GetByIdWithTokensAsync(command.UserId, cancellationToken);
+        var user = await userRepository.GetByIdAsync(command.UserId, cancellationToken);
 
         if (user is null)
             return Result.Failure(UserErrors.NotFound);

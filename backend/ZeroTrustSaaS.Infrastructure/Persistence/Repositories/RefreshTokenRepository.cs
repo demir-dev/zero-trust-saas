@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ZeroTrustSaaS.Application.Abstractions.Repositories;
 using ZeroTrustSaaS.Domain.Identity;
+using ZeroTrustSaaS.Domain.Identity.Enums;
 
 namespace ZeroTrustSaaS.Infrastructure.Persistence.Repositories;
 
@@ -43,5 +44,35 @@ internal sealed class RefreshTokenRepository(AppDbContext dbContext) : IRefreshT
     public void Update(RefreshToken refreshToken)
     {
         dbContext.RefreshTokens.Update(refreshToken);
+    }
+
+    public async Task RevokeAllBySessionIdAsync(
+        Guid sessionId,
+        DateTime revokedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var tokens = await dbContext.RefreshTokens
+            .Where(rt => rt.SessionId == sessionId
+                      && rt.RevokedAtUtc == null
+                      && rt.UsedAtUtc == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in tokens)
+            token.Revoke(revokedAtUtc, RefreshTokenRevocationReason.SessionRevoked);
+    }
+
+    public async Task RevokeAllByUserIdAsync(
+        Guid userId,
+        DateTime revokedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var tokens = await dbContext.RefreshTokens
+            .Where(rt => rt.UserId == userId
+                      && rt.RevokedAtUtc == null
+                      && rt.UsedAtUtc == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in tokens)
+            token.Revoke(revokedAtUtc, RefreshTokenRevocationReason.SessionRevoked);
     }
 }

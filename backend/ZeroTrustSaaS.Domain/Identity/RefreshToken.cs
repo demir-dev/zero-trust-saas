@@ -15,6 +15,7 @@ public sealed class RefreshToken : Entity
     private RefreshToken(
         Guid id,
         Guid userId,
+        Guid sessionId,
         Guid? tenantId,
         Guid? trustedDeviceId,
         RefreshTokenHash tokenHash,
@@ -24,6 +25,7 @@ public sealed class RefreshToken : Entity
         : base(id)
     {
         UserId = userId;
+        SessionId = sessionId;
         TenantId = tenantId;
         TrustedDeviceId = trustedDeviceId;
         TokenHash = tokenHash;
@@ -33,6 +35,8 @@ public sealed class RefreshToken : Entity
     }
 
     public Guid UserId { get; private set; }
+
+    public Guid SessionId { get; private set; }
 
     // Null = platform-context token; set = tenant-context token.
     public Guid? TenantId { get; private set; }
@@ -74,6 +78,7 @@ public sealed class RefreshToken : Entity
 
     public static Result<RefreshToken> Create(
         Guid userId,
+        Guid sessionId,
         RefreshTokenHash tokenHash,
         ClientInfo issuedClient,
         DateTime issuedAtUtc,
@@ -90,6 +95,7 @@ public sealed class RefreshToken : Entity
         var token = new RefreshToken(
             Guid.NewGuid(),
             userId,
+            sessionId,
             tenantId,
             trustedDeviceId,
             tokenHash,
@@ -100,20 +106,16 @@ public sealed class RefreshToken : Entity
         return Result<RefreshToken>.Success(token);
     }
 
-    public Result MarkAsUsed(
-        DateTime usedAtUtc)
+    public Result MarkAsUsed(DateTime usedAtUtc)
     {
         if (IsRevoked)
-            return Result.Failure(
-                RefreshTokenErrors.AlreadyRevoked);
+            return Result.Failure(RefreshTokenErrors.AlreadyRevoked);
 
         if (IsExpired)
-            return Result.Failure(
-                RefreshTokenErrors.Expired);
+            return Result.Failure(RefreshTokenErrors.Expired);
 
         if (IsUsed)
-            return Result.Failure(
-                RefreshTokenErrors.AlreadyUsed);
+            return Result.Failure(RefreshTokenErrors.AlreadyUsed);
 
         UsedAtUtc = usedAtUtc;
 
@@ -131,16 +133,13 @@ public sealed class RefreshToken : Entity
         }
 
         if (IsRevoked)
-            return Result.Failure(
-                RefreshTokenErrors.AlreadyRevoked);
+            return Result.Failure(RefreshTokenErrors.AlreadyRevoked);
 
         if (IsExpired)
-            return Result.Failure(
-                RefreshTokenErrors.Expired);
+            return Result.Failure(RefreshTokenErrors.Expired);
 
         if (IsUsed)
-            return Result.Failure(
-                RefreshTokenErrors.AlreadyUsed);
+            return Result.Failure(RefreshTokenErrors.AlreadyUsed);
 
         ReplacedByRefreshTokenId = replacementRefreshTokenId;
         UsedAtUtc = rotatedAtUtc;
@@ -154,8 +153,7 @@ public sealed class RefreshToken : Entity
         RefreshTokenRevocationReason reason)
     {
         if (IsRevoked)
-            return Result.Failure(
-                RefreshTokenErrors.AlreadyRevoked);
+            return Result.Failure(RefreshTokenErrors.AlreadyRevoked);
 
         RevokedAtUtc = revokedAtUtc;
         RevokedByIp = revokedByIp;

@@ -14,9 +14,8 @@ internal sealed class UserRepository(AppDbContext dbContext) : IUserRepository
 
     public Task<User?> GetByIdWithTokensAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return dbContext.Users
-            .Include(u => u.RefreshTokens)
-            .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+        // RefreshTokens are no longer a navigation on User. Delegates to standard lookup.
+        return GetByIdAsync(id, cancellationToken);
     }
 
     public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
@@ -83,25 +82,16 @@ internal sealed class UserRepository(AppDbContext dbContext) : IUserRepository
 
     public void Update(User user)
     {
-        // Capture new (Detached) collection members BEFORE attaching the User.
-        // Setting Entry(user).State = Modified triggers EF relationship fixup, which
-        // auto-tracks any navigation items it finds — changing their state from Detached
-        // to Modified. A newly created LoginAttempt/RefreshToken with a Guid PK would then
-        // be marked Modified (not Detached), so the post-attach check would miss them and
-        // EF would emit UPDATEs against rows that don't exist yet → DbUpdateConcurrencyException.
+        // Capture new (Detached) LoginAttempts BEFORE attaching the User so that EF
+        // relationship fixup doesn't accidentally mark them as Modified (→ UPDATE against
+        // non-existent rows).
         var newAttempts = user.LoginAttempts
             .Where(a => dbContext.Entry(a).State == EntityState.Detached)
-            .ToList();
-        var newTokens = user.RefreshTokens
-            .Where(t => dbContext.Entry(t).State == EntityState.Detached)
             .ToList();
 
         dbContext.Entry(user).State = EntityState.Modified;
 
         foreach (var attempt in newAttempts)
             dbContext.Entry(attempt).State = EntityState.Added;
-
-        foreach (var token in newTokens)
-            dbContext.Entry(token).State = EntityState.Added;
     }
 }

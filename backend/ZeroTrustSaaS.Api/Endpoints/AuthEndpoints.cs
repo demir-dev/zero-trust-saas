@@ -134,7 +134,7 @@ internal static class AuthEndpoints
             ICurrentUserContext currentUser,
             CancellationToken ct) =>
         {
-            var command = new LogoutCommand(currentUser.UserId, DateTime.UtcNow);
+            var command = new LogoutCommand(currentUser.UserId, DateTime.UtcNow, currentUser.SessionId);
             var result = await handler.Handle(command, ct);
 
             return result.IsSuccess

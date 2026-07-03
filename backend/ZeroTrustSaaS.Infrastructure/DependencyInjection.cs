@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<ISessionRepository, SessionRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<ITenantMembershipRepository, TenantMembershipRepository>();
@@ -42,6 +43,9 @@ public static class DependencyInjection
         services.AddScoped<ITenantStatusCache, TenantStatusCache>();
         services.AddScoped<ISessionStatusCache, SessionStatusCache>();
         services.AddScoped<IDeviceStatusCache, DeviceStatusCache>();
+
+        services.AddScoped<ITokenIssuanceService, TokenIssuanceService>();
+        services.AddScoped<ISessionValidationService, SessionValidationService>();
 
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddSingleton<ITokenGenerator, JwtTokenGenerator>();

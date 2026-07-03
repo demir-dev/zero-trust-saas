@@ -26,6 +26,7 @@ import TenantDashboardPage from '../../features/tenant/dashboard/pages/TenantDas
 import TenantUsersPage from '../../features/tenant/users/pages/TenantUsersPage'
 import TenantRolesPage from '../../features/tenant/roles/pages/TenantRolesPage'
 import TenantDevicesPage from '../../features/tenant/devices/pages/TenantDevicesPage'
+import TenantSessionsPage from '../../features/tenant/sessions/pages/TenantSessionsPage'
 import SecurityCenterPage from '../../features/tenant/security/pages/SecurityCenterPage'
 import TenantAuditPage from '../../features/tenant/audit/pages/TenantAuditPage'
 
@@ -101,6 +102,7 @@ export default function AppRouter() {
         <Route path="users" element={<TenantUsersPage />} />
         <Route path="roles" element={<TenantRolesPage />} />
         <Route path="devices" element={<TenantDevicesPage />} />
+        <Route path="sessions" element={<TenantSessionsPage />} />
         <Route path="security" element={<SecurityCenterPage />} />
         <Route path="audit" element={<TenantAuditPage />} />
       </Route>
