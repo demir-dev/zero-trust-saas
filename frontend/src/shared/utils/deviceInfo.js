@@ -25,7 +25,6 @@ export async function buildDeviceInfo() {
   const browser = await detectBrowser()
   const operatingSystem = detectOS()
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-  const screen = `${window.screen.width}x${window.screen.height}`
-  const deviceFingerprint = `${browser}|${operatingSystem}|${screen}|${tz}`.substring(0, 256)
-  return { deviceFingerprint, browser, operatingSystem, country: 'Unknown' }
+  const deviceFingerprint = `${browser}|${operatingSystem}|${tz}`.substring(0, 256)
+  return { deviceFingerprint, browser, operatingSystem }
 }

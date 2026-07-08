@@ -39,6 +39,7 @@ internal sealed class RoleRepository(AppDbContext dbContext) : IRoleRepository
         CancellationToken cancellationToken = default)
     {
         return await dbContext.Roles
+            .Include("Permissions")
             .Where(r => r.TenantId == null)
             .ToListAsync(cancellationToken);
     }
