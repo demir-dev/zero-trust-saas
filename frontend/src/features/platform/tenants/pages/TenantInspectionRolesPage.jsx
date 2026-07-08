@@ -54,7 +54,7 @@ export default function TenantInspectionRolesPage() {
                           )}
                         </Box>
                       }
-                      secondary={`${role.permissionCount ?? 0} permissions`}
+                      secondary={`${role.permissions?.length ?? 0} permissions`}
                     />
                   </ListItemButton>
                 </ListItem>
@@ -93,8 +93,8 @@ export default function TenantInspectionRolesPage() {
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                   {(selectedRole.permissions ?? []).map((perm) => (
                     <Chip
-                      key={perm.code}
-                      label={perm.code}
+                      key={perm}
+                      label={perm}
                       size="small"
                       sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
                     />

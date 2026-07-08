@@ -105,8 +105,6 @@ public sealed class LoginCommandHandler(
                     return Result<LoginResponse>.Failure(TrustedDeviceErrors.DeviceBlocked);
 
                 existing.RecordLogin(now);
-                if (command.TrustDevice && existing.IsPending)
-                    existing.Trust(now);
                 trustedDeviceRepository.Update(existing);
                 deviceId = existing.Id;
             }
@@ -120,8 +118,6 @@ public sealed class LoginCommandHandler(
                     if (newDeviceResult.IsSuccess)
                     {
                         var newDevice = newDeviceResult.Value;
-                        if (command.TrustDevice)
-                            newDevice.Trust(now);
                         await trustedDeviceRepository.AddAsync(newDevice, cancellationToken);
                         deviceId = newDevice.Id;
                     }
@@ -154,6 +150,23 @@ public sealed class LoginCommandHandler(
                 RequiresMfa: true,
                 UserId: user.Id,
                 IsPlatformUser: isPlatformUser));
+        }
+
+        if (!isTenantLogin)
+        {
+            var platformRolesCheck = await roleRepository.GetUserRolesAsync(user.Id, null, cancellationToken);
+            bool hasPlatformRole = platformRolesCheck.Any(ur => ur.IsActive);
+
+            if (!hasPlatformRole)
+            {
+                return Result<LoginResponse>.Success(new LoginResponse(
+                    AccessToken: null,
+                    RefreshToken: null,
+                    Result: LoginResult.TenantSelectionRequired,
+                    RequiresMfa: false,
+                    UserId: user.Id,
+                    IsPlatformUser: false));
+            }
         }
 
         var clientInfoForIssuance = BuildClientInfo(command);
