@@ -74,5 +74,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-#AI 
+# AI assistant files
 CLAUDE.md
+GEMINI.md
+CURSOR.md
+.cursorrules
