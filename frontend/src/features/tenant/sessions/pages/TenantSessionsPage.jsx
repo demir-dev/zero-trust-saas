@@ -50,6 +50,7 @@ export default function TenantSessionsPage() {
       setConfirmRevoke(null)
       queryClient.invalidateQueries({ queryKey: ['tenant', 'user-sessions', userId] })
     },
+    onError: () => setConfirmRevoke(null),
   })
 
   return (
@@ -199,6 +200,7 @@ export default function TenantSessionsPage() {
         onConfirm={() => revokeMutation.mutate(confirmRevoke)}
         onCancel={() => setConfirmRevoke(null)}
         confirmColor="warning"
+        loading={revokeMutation.isPending}
       />
     </Box>
   )

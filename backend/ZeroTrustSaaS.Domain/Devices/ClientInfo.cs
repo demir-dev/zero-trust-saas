@@ -9,7 +9,7 @@ public sealed class ClientInfo : ValueObject
 
     public IpAddress IpAddress { get; private set; } = null!;
 
-    public string Country { get; private set; } = string.Empty;
+    public string? Country { get; private set; }
 
     public string Browser { get; private set; } = string.Empty;
 
@@ -20,13 +20,13 @@ public sealed class ClientInfo : ValueObject
     private ClientInfo(
         DeviceFingerprint deviceFingerprint,
         IpAddress ipAddress,
-        string country,
+        string? country,
         string browser,
         string operatingSystem)
     {
         DeviceFingerprint = deviceFingerprint;
         IpAddress = ipAddress;
-        Country = country.Trim();
+        Country = country?.Trim();
         Browser = browser.Trim();
         OperatingSystem = operatingSystem.Trim();
     }
@@ -34,18 +34,10 @@ public sealed class ClientInfo : ValueObject
     public static Result<ClientInfo> Create(
         DeviceFingerprint deviceFingerprint,
         IpAddress ipAddress,
-        string country,
+        string? country,
         string browser,
         string operatingSystem)
     {
-        if (string.IsNullOrWhiteSpace(country))
-        {
-            return Result<ClientInfo>.Failure(
-                Error.Validation(
-                    "Devices.ClientInfo.CountryRequired",
-                    "Country is required."));
-        }
-
         if (string.IsNullOrWhiteSpace(browser))
         {
             return Result<ClientInfo>.Failure(
@@ -74,7 +66,7 @@ public sealed class ClientInfo : ValueObject
     public static ClientInfo From(
         DeviceFingerprint deviceFingerprint,
         IpAddress ipAddress,
-        string country,
+        string? country,
         string browser,
         string operatingSystem)
     {

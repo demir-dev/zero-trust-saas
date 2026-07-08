@@ -59,8 +59,7 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
 
             ic.Property(c => c.Country)
                 .HasColumnName("country")
-                .HasMaxLength(100)
-                .IsRequired();
+                .HasMaxLength(100);
 
             ic.Property(c => c.Browser)
                 .HasColumnName("browser")
