@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using ZeroTrustSaaS.Domain.Audit;
 using ZeroTrustSaaS.Domain.Authorization;
 using ZeroTrustSaaS.Domain.Devices;
@@ -39,5 +40,22 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
+        // Every aggregate/entity Id is assigned by the domain layer (Guid.NewGuid() in
+        // constructors), never by the database. Without this, EF's default
+        // ValueGeneratedOnAdd convention for Guid keys makes it use "is the key already
+        // set?" as its heuristic for Added vs. Modified when a new entity is discovered
+        // through an already-tracked parent's collection navigation (e.g. a new child
+        // appended to an Include()-loaded collection). Since our keys are always set
+        // before the entity is ever tracked, that heuristic misfires and marks brand-new
+        // rows as Modified, producing UPDATE statements against rows that don't exist yet.
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.IsPrimaryKey() && property.ClrType == typeof(Guid))
+                    property.ValueGenerated = ValueGenerated.Never;
+            }
+        }
     }
 }
