@@ -82,16 +82,11 @@ internal sealed class UserRepository(AppDbContext dbContext) : IUserRepository
 
     public void Update(User user)
     {
-        // Capture new (Detached) LoginAttempts BEFORE attaching the User so that EF
-        // relationship fixup doesn't accidentally mark them as Modified (→ UPDATE against
-        // non-existent rows).
-        var newAttempts = user.LoginAttempts
-            .Where(a => dbContext.Entry(a).State == EntityState.Detached)
-            .ToList();
-
-        dbContext.Entry(user).State = EntityState.Modified;
-
-        foreach (var attempt in newAttempts)
-            dbContext.Entry(attempt).State = EntityState.Added;
+        // No-op: every caller fetches the User via GetByIdAsync on this same scoped
+        // DbContext before mutating it, so the aggregate is already tracked. EF's
+        // automatic change detection on SaveChanges picks up scalar changes and newly
+        // added LoginAttempts without help — see AppDbContext.OnModelCreating, which
+        // configures all Guid keys as ValueGeneratedNever so EF stops guessing
+        // Added vs. Modified from whether the key is already set.
     }
 }
