@@ -116,18 +116,17 @@ export default function LoginPage() {
         }
         return
       }
-      const { isPlatformUser, hasTenantContext } = window.__authContextRef ?? {}
-      // Navigation is handled via auth context change, but we need to check here
-      // We re-read from the updated auth store via the returned token
+      if (result.result === 'TenantSelectionRequired') {
+        setSavedCreds({ email: data.email, password: data.password })
+        setPhase(1)
+        return
+      }
       const { parseJwtClaims } = await import('../../../shared/utils/jwt')
       const claims = parseJwtClaims(result.accessToken)
       if (claims.platformRoles?.length > 0) {
         navigate('/platform')
-      } else if (claims.tenantId) {
-        navigate('/tenant')
       } else {
-        setSavedCreds({ email: data.email, password: data.password })
-        setPhase(1)
+        navigate('/tenant')
       }
     } catch (err) {
       setError(err)

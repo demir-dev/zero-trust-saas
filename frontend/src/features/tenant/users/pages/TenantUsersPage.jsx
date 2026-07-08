@@ -237,6 +237,13 @@ function DevicesTab({ userId }) {
   )
 }
 
+function SessionStatusChip({ status, isExpired }) {
+  if (isExpired) return <Chip label="Expired" size="small" color="default" />
+  if (status === 1) return <Chip label="Active" size="small" color="success" />
+  if (status === 3) return <Chip label="Revoked" size="small" color="error" />
+  return <Chip label={String(status)} size="small" />
+}
+
 function SessionsTab({ userId }) {
   const queryClient = useQueryClient()
   const [revokeAllConfirm, setRevokeAllConfirm] = useState(false)
@@ -249,15 +256,17 @@ function SessionsTab({ userId }) {
   const revokeSessionMutation = useMutation({
     mutationFn: (sessionId) => api.post(`/users/${userId}/sessions/${sessionId}/revoke`),
     onSuccess: () => { invalidate(); setRevokeSessionConfirm(null) },
+    onError: () => setRevokeSessionConfirm(null),
   })
 
   const revokeAllMutation = useMutation({
     mutationFn: () => api.post(`/users/${userId}/revoke-sessions`),
     onSuccess: () => { invalidate(); setRevokeAllConfirm(false) },
+    onError: () => setRevokeAllConfirm(false),
   })
 
   if (isLoading) return <Typography color="text.secondary">Loading…</Typography>
-  if (!sessions?.length) return <Typography variant="body2" color="text.secondary">No active sessions.</Typography>
+  if (!sessions?.length) return <Typography variant="body2" color="text.secondary">No sessions found.</Typography>
 
   return (
     <Box>
@@ -268,23 +277,32 @@ function SessionsTab({ userId }) {
       </Box>
 
       <Stack spacing={1}>
-        {sessions.map((s) => (
-          <Box key={s.id} sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Box>
-              <Typography variant="body2" fontWeight={500}>{s.browser} / {s.operatingSystem}</Typography>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                {s.ipAddress && <Typography variant="caption" color="text.disabled" sx={{ fontFamily: 'monospace' }}>{s.ipAddress}</Typography>}
-                <Typography variant="caption" color="text.disabled">Issued {fmt(s.issuedAtUtc)}</Typography>
-                <Typography variant="caption" color="text.disabled">Expires {fmt(s.expiresAtUtc)}</Typography>
+        {sessions.map((s) => {
+          const isExpired = new Date(s.expiresAtUtc) <= new Date()
+          const canRevoke = s.status === 1 && !isExpired
+          return (
+            <Box key={s.id} sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Typography variant="body2" fontWeight={500}>{s.browser} / {s.operatingSystem}</Typography>
+                  <SessionStatusChip status={s.status} isExpired={isExpired} />
+                </Box>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  {s.ipAddress && <Typography variant="caption" color="text.disabled" sx={{ fontFamily: 'monospace' }}>{s.ipAddress}</Typography>}
+                  <Typography variant="caption" color="text.disabled">Created {fmt(s.createdAtUtc)}</Typography>
+                  <Typography variant="caption" color="text.disabled">Expires {fmt(s.expiresAtUtc)}</Typography>
+                </Box>
               </Box>
+              {canRevoke && (
+                <Tooltip title="Revoke this session">
+                  <IconButton size="small" color="error" onClick={() => setRevokeSessionConfirm(s.id)}>
+                    <RevokeSessionsIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
             </Box>
-            <Tooltip title="Revoke this session">
-              <IconButton size="small" color="error" onClick={() => setRevokeSessionConfirm(s.id)}>
-                <RevokeSessionsIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        ))}
+          )
+        })}
       </Stack>
 
       <ConfirmDialog
@@ -293,6 +311,7 @@ function SessionsTab({ userId }) {
         message="Revoke this specific session? The user will be signed out on that device."
         onConfirm={() => revokeSessionMutation.mutate(revokeSessionConfirm)}
         onCancel={() => setRevokeSessionConfirm(null)}
+        loading={revokeSessionMutation.isPending}
       />
       <ConfirmDialog
         open={revokeAllConfirm}
@@ -300,6 +319,7 @@ function SessionsTab({ userId }) {
         message="Revoke all active sessions for this user? They will be signed out on all devices immediately."
         onConfirm={() => revokeAllMutation.mutate()}
         onCancel={() => setRevokeAllConfirm(false)}
+        loading={revokeAllMutation.isPending}
       />
     </Box>
   )
